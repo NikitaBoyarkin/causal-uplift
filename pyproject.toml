@@ -1,0 +1,15 @@
+[project]
+name = "causal-uplift"
+version = "0.1.0"
+description = "Causal inference for product experiments: CUPED variance reduction + uplift modeling (T/S-learner) with heterogeneous treatment effects."
+requires-python = ">=3.10"
+dependencies = [
+    "pandas>=2.0",
+    "numpy>=1.24",
+    "scikit-learn>=1.4",
+    "lightgbm>=4.3",
+    "matplotlib>=3.7",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
