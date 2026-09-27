@@ -1,5 +1,7 @@
 """Ensure the experiment dataset exists before tests."""
-import pathlib, subprocess, sys
+import pathlib
+import subprocess
+import sys
 
 ROOT = pathlib.Path(__file__).parent.parent
 DATA = ROOT / "data" / "experiment.csv"

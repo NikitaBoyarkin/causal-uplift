@@ -16,8 +16,8 @@ import pandas as pd
 import pytest
 
 from src import eval as ueval
-from src.cuped import cuped_adjust, run_cuped
-from src.uplift import SEGMENT_DTYPE, _X, run_uplift
+from src.cuped import ate_with_se, cuped_adjust, run_cuped
+from src.uplift import _X, SEGMENT_DTYPE, run_uplift, t_learner
 
 ROOT = pathlib.Path(__file__).parent.parent
 DATA = ROOT / "data" / "experiment.csv"
@@ -88,7 +88,8 @@ def test_cuped_shift_invariance():
 
 
 def test_cuped_uninformative_covariate_leaves_precision_unchanged():
-    df = _df().assign(noise=np.arange(len(_df())) % 7)
+    df = _df()
+    df = df.assign(noise=np.arange(len(df)) % 7)
     r = run_cuped(df, y_col="y_cont", x_col="noise")
     assert abs(r["se_ratio"] - 1) < 0.05
 
@@ -103,7 +104,7 @@ def test_cuped_rejects_degenerate_covariate():
 
 def test_ate_with_se_known_values():
     df = pd.DataFrame({"treatment": [1, 1, 1, 0, 0, 0], "y": [3.0, 4.0, 5.0, 0.0, 1.0, 2.0]})
-    r = ueval.__dict__ and __import__("src.cuped", fromlist=["ate_with_se"]).ate_with_se(df, "y")
+    r = ate_with_se(df, "y")
     assert r["ate"] == pytest.approx(3.0)
     assert r["var_t"] == pytest.approx(1.0)
     assert r["var_c"] == pytest.approx(1.0)
@@ -114,18 +115,25 @@ def test_ate_with_se_known_values():
 def test_ate_with_se_rejects_empty_arm():
     df = pd.DataFrame({"treatment": [1, 1], "y": [1.0, 2.0]})
     with pytest.raises(ValueError, match="per arm"):
-        __import__("src.cuped", fromlist=["ate_with_se"]).ate_with_se(df, "y")
+        ate_with_se(df, "y")
 
 
 def test_uplift_at_top_k_finds_top_not_bottom():
-    """Dropping the `[::-1]` (i.e. scoring the worst users) must be caught."""
+    """Dropping the `[::-1]` (i.e. ranking the worst users first) must be caught.
+
+    `x` is independent of the arm, so the top-k subset stays mixed; only the
+    direction of the sort decides the sign of the gap.
+    """
     rng = np.random.default_rng(0)
-    n = 4000
-    w = np.tile([0, 1], n // 2)
-    y = (rng.random(n) < np.where(w == 1, 0.4, 0.1)).astype(float)
-    assert ueval.uplift_at_top_k(np.full(n, 0.5), y, w, 0.2) == pytest.approx(0.3, abs=0.08)
-    worst = np.where(w == 1, 0.0, 1.0)          # scores the control arm highest
-    assert ueval.uplift_at_top_k(worst, y, w, 0.2) < 0
+    n = 20000
+    x = rng.normal(size=n)
+    w = rng.integers(0, 2, size=n)
+    p = 1 / (1 + np.exp(-(0.2 * x + 1.5 * x * w)))    # effect grows with x
+    y = (rng.random(n) < p).astype(float)
+    assert ueval.uplift_at_top_k(x, y, w, 0.2) > 0.15
+    assert ueval.uplift_at_top_k(-x, y, w, 0.2) < -0.15
+    # a constant score carries no signal at all
+    assert ueval.uplift_at_top_k(np.full(n, 0.5), y, w, 0.2) == pytest.approx(0.0, abs=0.05)
 
 
 def test_uplift_at_top_k_single_arm_is_nan_not_zero():
@@ -143,15 +151,22 @@ def test_qini_rejects_single_arm():
         ueval.qini_coefficient(np.arange(n, dtype=float), y, np.ones(n))
 
 
-def test_oracle_is_ceiling_on_rank_metrics(up):
-    """Ranking by the true tau must be the best achievable ordering."""
+def test_oracle_ranks_true_tau_perfectly_but_only_marginally_beats_noise(up):
+    """The ceiling, and how low it is.
+
+    Ranking by the known `tau_true` recovers it perfectly, yet at n=6000 its
+    QINI lands only ~2 null-sd above random - so no learner's QINI here is
+    evidence of anything. This test binds *both* halves of that claim.
+    """
     test = up["test"]
     y, w = test["y_bin"], test["treatment"]
     oracle = test["tau_true"].to_numpy()
     assert ueval.ite_recovery(oracle, test)["corr_pearson_with_true"] == pytest.approx(1.0)
-    oracle_auuc = ueval.auuc(oracle, y, w)
-    for name in ("t_learner", "s_learner", "random"):
-        assert oracle_auuc > ueval.auuc(up[name], y, w), f"oracle does not beat {name}"
+
+    null = ueval.metric_null(y, w, ueval.qini_coefficient, n_draws=80)
+    z = ueval.z_vs_null(ueval.qini_coefficient(oracle, y, w), null)
+    assert z > 1.5, f"oracle qini is not above random (z={z:.2f})"
+    assert z < 5.0, f"oracle qini is supposed to be noise-dominated, got z={z:.2f}"
 
 
 def test_qini_random_is_within_noise_of_zero(up):
@@ -181,7 +196,7 @@ def test_auuc_random_carries_a_positive_offset(up):
 def test_ite_recovery_is_nan_when_tau_has_no_variance(up):
     test = up["test"].copy()
     test["tau_true"] = 0.5
-    r = ueval.ite_recovery(up["oracle_tau"] if "oracle_tau" in up else up["s_learner"], test)
+    r = ueval.ite_recovery(up["s_learner"], test)
     assert np.isnan(r["corr_pearson_with_true"])
     assert np.isnan(r["rank_corr_with_true"])
 
@@ -212,7 +227,7 @@ def test_unknown_segment_fails_loudly():
 
 def test_uplift_beats_random(up):
     test = up["test"]
-    y, w = test["y_bin"], test["treatment"]
+    _y, _w = test["y_bin"], test["treatment"]
     rand_corr = ueval.ite_recovery(up["random"], test)["corr_pearson_with_true"]
     for name in ("t_learner", "s_learner"):
         corr = ueval.ite_recovery(up[name], test)["corr_pearson_with_true"]
@@ -237,10 +252,24 @@ def test_segment_truth_rejects_unknown_segment():
         ueval.segment_truth(_df(), segments=("vip",))
 
 
+def test_learners_honour_the_requested_outcome_column():
+    """`y_col` was accepted but ignored - the body read `.y_bin` directly."""
+    df = _df().iloc[:900].assign(y_alt=lambda d: (d.x_pre > 0).astype(int))
+    train, test = df.iloc[:600], df.iloc[600:]
+    assert not np.allclose(t_learner(train, test, y_col="y_bin"),
+                           t_learner(train, test, y_col="y_alt"))
+
+
 # --- end to end --------------------------------------------------------------
 
 def test_cli_writes_valid_json_and_plot(tmp_path):
-    """Drives run.py from a foreign cwd; json.loads rejects a bare NaN."""
+    """Drives run.py from a foreign cwd; json.loads rejects a bare NaN.
+
+    Artifacts are removed first: asserting they merely *exist* would pass off a
+    stale file left by an earlier run.
+    """
+    for name in ("metrics.json", "uplift.png"):
+        (ROOT / "reports" / name).unlink(missing_ok=True)
     proc = subprocess.run(
         [sys.executable, str(ROOT / "run.py"), "--n-boot", "20", "--n-null", "20"],
         cwd=tmp_path, capture_output=True, text=True, timeout=600,

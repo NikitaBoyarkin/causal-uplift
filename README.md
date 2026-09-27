@@ -21,36 +21,72 @@ treatment effect, so the estimates can be checked against ground truth.
 | Naive | 0.270 | 0.019 | [0.232, 0.308] |
 | CUPED | 0.276 | 0.014 | [0.247, 0.304] |
 
-The point estimate is unchanged (0.270 → 0.276, within noise). The standard
-error shrinks by ~26% (×0.74), and the CI narrows 1.35×. Variance reduction
-~45% actual vs 55% theoretical (the gap is the covariate being a pre-period
-proxy, not the outcome itself). Concretely: an experiment that needed 10k
-users per arm now needs ~5.6k for the same power.
+The point estimate is unchanged within noise (0.270 → 0.276, shift 0.0053 —
+exactly the covariate imbalance `θ(x̄t − x̄c)`, which a perfectly balanced split
+would zero out). The standard error shrinks by ~26% (×0.742) and the CI narrows
+1.35×.
+
+Variance reduction: **0.449 actual vs 0.445 theory (ρ²)** — the two agree, as
+they should: `x_pre` is a genuine pre-period covariate and the estimator is
+unbiased. Concretely, an experiment that needed 10k users per arm now needs
+**~5.5k** for the same power (10k × 0.742²).
 
 ### Uplift (ITE recovery)
 
-| Model | AUUC | QINI | uplift@20% | corr(τ) |
-|---|---|---|---|---|
-| T-learner | 0.0043 | 0.0014 | 0.072 | 0.50 |
-| S-learner | 0.0057 | 0.0029 | 0.041 | 0.66 |
-| Random | 0.0014 | −0.0014 | −0.015 | 0.007 |
+| Model | AUUC | z vs null | QINI | z vs null | uplift@20% | corr(τ) | rank corr |
+|---|---|---|---|---|---|---|---|
+| `oracle_tau` (true τ) | 0.0066 | 2.25 | 0.0038 | 2.25 | 0.0558 | 1.000 | 1.000 |
+| S-learner | 0.0057 | 1.72 | 0.0029 | 1.72 | 0.0405 | 0.657 | 0.621 |
+| T-learner | 0.0043 | 0.81 | 0.0014 | 0.81 | 0.0724 | 0.495 | 0.458 |
+| Random | 0.0077 | 2.90 | 0.0048 | 2.90 | 0.0590 | 0.011 | 0.011 |
 
-Both learners beat random on every metric. Segment-level recovery (predicted
-vs empirical ground truth):
+Null reference (200 random scorers on the same test split): AUUC
++0.00293 ± 0.00164, QINI +0.00009 ± 0.00164.
 
-| Segment | Truth (binary uplift) | T-learner | S-learner |
+The honest reading is **not** "both learners beat random". At n = 6000 the curve
+metrics are noise-dominated, and the table says so three ways:
+
+- The T-learner sits at **0.81σ** — indistinguishable from random.
+- The S-learner is at **1.72σ** — marginal at best.
+- The **oracle**, which ranks users by the *known true* individual effect, is
+  only at **2.25σ**. That is the ceiling; nothing above it is achievable here.
+- The single seeded random scorer happens to land at **2.90σ**, above both real
+  learners. That is what a ±0.0016 null looks like when you draw from it once.
+
+Every 95% bootstrap interval straddles zero and overlaps every other model:
+
+| Model | AUUC 95% CI | QINI 95% CI | uplift@20% 95% CI |
 |---|---|---|---|
-| new | 0.110 | 0.126 | 0.120 |
-| returning | 0.010 | 0.018 | 0.019 |
+| `oracle_tau` | [−0.0015, 0.0135] | [0.0003, 0.0067] | [0.0025, 0.1117] |
+| S-learner | [−0.0006, 0.0127] | [−0.0005, 0.0061] | [−0.0211, 0.0990] |
+| T-learner | [−0.0026, 0.0114] | [−0.0017, 0.0050] | [0.0187, 0.1311] |
+| Random | [0.0014, 0.0139] | [0.0015, 0.0081] | [0.0063, 0.1068] |
 
-The model recovers that "new" users respond ~10× more than "returning" users —
-the targeting signal a discount campaign would act on.
+What *is* statistically clear at this sample size is the **ranking quality** and
+the **segment split**, both of which have a reference that is not noise:
 
-A note on honesty: the latent ground-truth τ is 0.60 (new) / 0.08 (returning),
-but the *conversion* uplift is ~0.11 / 0.01 because the sigmoid at a high
-baseline conversion (~71%) damps large latent effects. Comparing predicted
-binary uplift to latent τ would be a scale mismatch; we report rank
-correlation (scale-free) and per-segment empirical recovery (same scale).
+| Segment | Empirical gap (95% CI) | T-learner | S-learner | n (test) |
+|---|---|---|---|---|
+| `new` | 0.1108 [0.0894, 0.1357] | 0.126 | 0.120 | 1782 |
+| `returning` | 0.0132 [−0.0013, 0.0271] | 0.018 | 0.019 | 4218 |
+
+`corr(τ)` is 0.50–0.66 against 0.011 for random, and the model recovers that
+"new" users respond ~8× more than "returning" users — the targeting signal a
+discount campaign would act on. Note the reference CI: the predicted means
+(a 6k test split) and the reference (the full 20k) carry separate sampling
+error, so `abs_err ≈ 0.015` means little until the intervals are compared —
+they overlap comfortably.
+
+Two footnotes on honesty:
+
+- The latent ground-truth τ is 0.60 (`new`) / 0.08 (`returning`), but the
+  *conversion* uplift is ~0.11 / 0.01 because the sigmoid at a high baseline
+  conversion (~71%) damps large latent effects. Comparing predicted binary
+  uplift to latent τ would be a scale mismatch; the binary comparison above is
+  on the same scale.
+- `tau_true` takes only **two** values (one per segment), so `corr(τ)` is a
+  between-segment point-biserial correlation, not a within-segment ITE ranking.
+  Both Pearson and rank versions are reported; they differ only in tie handling.
 
 ## Data
 
@@ -65,12 +101,30 @@ Synthetic, deterministic (seed = 42). 20,000 users in a randomized experiment:
 ## Methods
 
 - **CUPED**: `Y_adj = Y − θ·(X − mean(X))`, `θ = Cov(Y,X)/Var(X)`. The ATE
-  estimate on `Y_adj` has the same expectation and ~`(1 − ρ²)` of the variance.
+  estimate on `Y_adj` has the same expectation and ~`(1 − ρ²)` of the variance,
+  i.e. a variance *reduction* of `ρ²`.
 - **T-learner**: one model per treatment arm; uplift = `P(t=1) − P(t=0)`.
 - **S-learner**: one model with `treatment` as a feature;
   uplift = `pred(t=1) − pred(t=0)`.
-- **Evaluation**: AUUC, Qini coefficient, uplift@top-20%, rank correlation
-  with latent τ, and per-segment empirical recovery.
+- **Evaluation**: AUUC, Qini coefficient, uplift@top-20%, correlation with
+  latent τ, and per-segment empirical recovery — each paired with a reference.
+
+### Reading a curve metric honestly
+
+Three helpers in `src/eval.py` keep the curve metrics from being read as
+evidence on their own:
+
+- `metric_null(y, w, fn)` — the metric's distribution under *random* scoring
+  (200 draws, seeded). Note AUUC is **not** centered at zero: because the curve
+  uses a running `cum_t/cum_c` ratio, a random scorer's AUUC sits near `C/(2n)`,
+  so a raw AUUC carries a positive offset.
+- `bootstrap_ci(fn, uplift, y, w)` — percentile interval on the test split.
+- `z_vs_null(value, null)` — how many null SDs above random the value sits.
+
+`run.py` prints all three per model, plus an `oracle_tau` row (ranking by the
+known τ) as the achievable ceiling. It also writes `metrics.json` with
+`allow_nan=False`, so an undefined metric fails loudly instead of emitting
+invalid JSON.
 
 Implemented from scratch on LightGBM (no `causalml`/`econml` dependency) so the
 mechanics are visible. In production these would be `econml`'s
@@ -79,13 +133,18 @@ mechanics are visible. In production these would be `econml`'s
 ## Quick start
 
 ```bash
-uv run --with pandas --with numpy python data/generate_data.py
-uv run --with pandas --with numpy --with scikit-learn --with lightgbm --with matplotlib python run.py
-uv run --with pandas --with numpy --with scikit-learn --with lightgbm --with matplotlib --with pytest pytest -q
+uv sync
+uv run python data/generate_data.py   # writes data/experiment.csv
+uv run python run.py                  # prints tables, writes reports/
+uv run pytest -q                      # 23 tests
+uv run ruff check .                   # lint
 ```
 
+Options: `--n-boot` (bootstrap resamples, 400) and `--n-null` (null draws, 200)
+trade runtime for tighter references.
+
 Outputs: `reports/metrics.json` + `reports/uplift.png` (QINI curves + segment
-uplift vs ground truth).
+uplift against the empirical gap, with its CI).
 
 ## Layout
 
@@ -96,11 +155,12 @@ causal-uplift/
 │   ├── config.py              # seed + LGBM learner params
 │   ├── cuped.py               # CUPED adjustment + ATE/SE
 │   ├── uplift.py              # T-learner / S-learner
-│   └── eval.py                # AUUC, QINI, uplift@k, recovery
-├── tests/                     # data sanity, CUPED, uplift-beats-random, recovery
-├── reports/                   # metrics.json + uplift.png (gitignored)
-├── conftest.py
-└── run.py
+│   └── eval.py                # AUUC, QINI, uplift@k, recovery, null/CI
+├── tests/                     # 23 tests incl. mutation-verified guards
+├── reports/                   # metrics.json + uplift.png (generated, gitignored)
+├── run.py                     # CLI
+├── uv.lock                    # committed: reproducible environment
+└── pyproject.toml
 ```
 
 ## Notes
@@ -113,3 +173,7 @@ causal-uplift/
 - The synthetic data has a true heterogeneous effect, which is the only reason
   recovery can be checked. On real data you never observe the ITE — that is the
   fundamental problem of causal inference.
+- The most transferable lesson here is the sample-size one: with ~6k test rows
+  and a ~30% baseline conversion, AUUC/QINI cannot separate a *perfect* ranker
+  from noise. Reporting a bare QINI without a null reference would have made the
+  T-learner look like a real result.

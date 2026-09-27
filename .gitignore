@@ -6,4 +6,3 @@ data/*.csv
 reports/*.png
 reports/*.json
 .pytest_cache/
-uv.lock
