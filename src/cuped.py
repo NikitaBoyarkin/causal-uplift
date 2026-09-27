@@ -3,7 +3,14 @@
 Given a pre-period covariate X correlated with the outcome Y, the adjusted
 outcome Y_adj = Y - theta*(X - mean(X)), theta = Cov(Y,X)/Var(X), has the same
 expected treatment effect but smaller variance. The ATE point estimate is
-unchanged; its standard error shrinks by ~sqrt(1 - rho^2).
+unchanged up to theta*(mean(X|t) - mean(X|c)), which vanishes under covariate
+balance; its standard error shrinks by ~sqrt(1 - rho^2).
+
+Conventions used here:
+  * `var_reduction_*` are the *reduction* (rho^2), not the retained fraction
+    (1 - rho^2). They are the same quantity the theory predicts, so theory and
+    actual are directly comparable.
+  * `se_ratio = se_cuped / se_naive` is sqrt(1 - rho^2).
 
 Reference: Deng, Xu, Kohavi, Walker (2013), "Improving the Sensitivity of
 Online Controlled Experiments by Utilizing Pre-Experiment Data".
@@ -14,20 +21,36 @@ import numpy as np
 import pandas as pd
 
 
-def cuped_adjust(df: pd.DataFrame, y_col: str, x_col: str) -> pd.DataFrame:
-    cov = np.cov(df[y_col], df[x_col], ddof=1)[0, 1]
+def cuped_adjust(df: pd.DataFrame, y_col: str, x_col: str) -> tuple[pd.DataFrame, dict[str, float]]:
+    """Return (df with a `y_adj` column, theta/rho diagnostics)."""
     var_x = np.var(df[x_col], ddof=1)
+    if not np.isfinite(var_x) or var_x <= 0:
+        raise ValueError(
+            f"covariate {x_col!r} has non-positive variance ({var_x}) - CUPED is undefined"
+        )
+    cov = np.cov(df[y_col], df[x_col], ddof=1)[0, 1]
     theta = cov / var_x
     x_mean = df[x_col].mean()
     out = df.copy()
     out["y_adj"] = df[y_col] - theta * (df[x_col] - x_mean)
     rho = np.corrcoef(df[y_col], df[x_col])[0, 1]
-    return out, {"theta": theta, "rho": rho, "var_reduction_theory": 1 - rho**2}
+    if not np.isfinite(rho):
+        raise ValueError(f"correlation of {y_col!r} and {x_col!r} is not finite")
+    return out, {
+        "theta": float(theta),
+        "rho": float(rho),
+        # rho^2 is the variance *reduction*; 1 - rho^2 is the retained fraction.
+        "var_reduction_theory": float(rho**2),
+    }
 
 
 def ate_with_se(df: pd.DataFrame, y_col: str) -> dict:
     t = df.loc[df.treatment == 1, y_col]
     c = df.loc[df.treatment == 0, y_col]
+    if len(t) < 2 or len(c) < 2:
+        raise ValueError(
+            f"need >=2 observations per arm, got treatment={len(t)} control={len(c)}"
+        )
     ate = t.mean() - c.mean()
     se = np.sqrt(t.var(ddof=1) / len(t) + c.var(ddof=1) / len(c))
     ci = (ate - 1.96 * se, ate + 1.96 * se)
