@@ -1,5 +1,34 @@
 # Causal / Uplift
 
+> CUPED shrinks the standard error **~26%** (an experiment needing 10k users/arm now needs **~5.5k**); uplift modeling finds `new` users respond **~8×** more than `returning`.
+
+## Navigation
+- 🌐 [Portfolio site](https://nikitaboyarkin.github.io)
+- 🏦 [Flagship case: Volta neobank](https://github.com/NikitaBoyarkin/volta-banking)
+- 🧪 Related: [ab_test](https://github.com/NikitaBoyarkin/ab_test) · [causal-uplift](https://github.com/NikitaBoyarkin/causal-uplift) · [browser-mini-games](https://github.com/NikitaBoyarkin/browser-mini-games)
+
+**On this page:** [Situation](#situation) · [Task](#task) · [Actions](#actions) · [Result](#result) · [What it shows](#what-it-shows) · [Data](#data) · [Methods](#methods) · [Quick start](#quick-start) · [Layout](#layout) · [Notes](#notes)
+
+## Situation
+An A/B test that stops at "two-sample t-test on the outcome" leaves two questions on the table: how to buy power for free from data already collected, and who the treatment actually works on. The second question has no observable answer on real data — the individual treatment effect is the fundamental problem of causal inference — so a method claiming to recover it needs a ground truth to be checked against.
+
+## Task
+Implement CUPED variance reduction and uplift modeling (ITE estimation) from scratch on a synthetic randomized experiment with a known, heterogeneous treatment effect, so the estimates can be compared against ground truth and a null reference.
+
+## Actions
+- Implement CUPED as `Y_adj = Y − θ·(X − mean(X))`, `θ = Cov(Y,X)/Var(X)`.
+- Implement T-learner and S-learner uplift models on LightGBM (no `causalml`/`econml` dependency).
+- Score with AUUC, Qini, uplift@top-20%, plus correlation with latent τ and per-segment recovery.
+- Guard each curve metric with a null distribution (200 seeded draws), a bootstrap CI, and a z-vs-null score.
+- Add an `oracle_tau` row — ranking by the known true effect — as the achievable ceiling.
+
+## Result
+- **~26%** — CUPED standard-error reduction (×0.742), CI narrowing 1.35×.
+- **~5.5k** — users per arm now enough for the power 10k used to buy.
+- **0.449 vs 0.445** — actual vs theory (ρ²) variance reduction: the two agree.
+- **~8×** — the `new` vs `returning` response gap (0.1108 vs 0.0132).
+- **2.25σ** — the oracle ceiling vs null; the T-learner sits at 0.81σ, indistinguishable from random.
+
 Causal inference for product experiments — two methods that go beyond
 "two-sample t-test on the outcome":
 
