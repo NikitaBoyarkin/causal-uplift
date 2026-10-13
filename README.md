@@ -124,7 +124,8 @@ Synthetic, deterministic (seed = 42). 20,000 users in a randomized experiment:
 - `segment` — `new` (30%) / `returning` (70%) → heterogeneous treatment effect.
 - `x_pre` — pre-period covariate, correlated with the outcome (ρ ≈ 0.67).
 - `treatment` — 50/50, independent of everything (clean randomization).
-- `tau_true` — the ground-truth individual treatment effect (eval only).
+- `tau_true` — the ground-truth individual treatment effect (eval only; must never
+  enter the feature set — that would be leakage).
 - `y_cont` — continuous outcome; `y_bin` — binary conversion.
 
 ## Methods

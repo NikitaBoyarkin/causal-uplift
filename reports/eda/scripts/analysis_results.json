@@ -1,0 +1,322 @@
+{
+  "shape": [
+    20000,
+    7
+  ],
+  "columns": [
+    "user_id",
+    "segment",
+    "x_pre",
+    "treatment",
+    "y_cont",
+    "y_bin",
+    "tau_true"
+  ],
+  "columns_match_expected": true,
+  "dtypes": {
+    "user_id": "int64",
+    "segment": "str",
+    "x_pre": "float64",
+    "treatment": "int64",
+    "y_cont": "float64",
+    "y_bin": "int64",
+    "tau_true": "float64"
+  },
+  "user_id_unique": true,
+  "null_counts": {
+    "user_id": 0,
+    "segment": 0,
+    "x_pre": 0,
+    "treatment": 0,
+    "y_cont": 0,
+    "y_bin": 0,
+    "tau_true": 0
+  },
+  "full_row_dups": 0,
+  "key_dups": 0,
+  "treatment_values": [
+    0,
+    1
+  ],
+  "segment_values": [
+    "new",
+    "returning"
+  ],
+  "y_bin_values": [
+    0,
+    1
+  ],
+  "tau_true_values": [
+    0.08,
+    0.6
+  ],
+  "x_pre_range": [
+    -4.257,
+    5.6854
+  ],
+  "y_cont_range": [
+    -2.8748,
+    8.2151
+  ],
+  "y_bin_rate": 0.7342,
+  "srm": {
+    "n_treatment": 9901,
+    "n_control": 10099,
+    "share_treatment": 0.49505,
+    "share_control": 0.50495,
+    "expected": 10000.0,
+    "chi2": 1.9602,
+    "p_value": 0.1614919304446262,
+    "verdict": "PASS (no SRM)"
+  },
+  "segment_split": {
+    "n_new": 6015,
+    "n_returning": 13985,
+    "share_new": 0.30075,
+    "share_returning": 0.69925,
+    "chi2_vs_30_70": 0.05357142857142857,
+    "p_value": 0.8169613217153913
+  },
+  "segment_x_treatment": {
+    "table": {
+      "0": {
+        "new": 3032,
+        "returning": 7067
+      },
+      "1": {
+        "new": 2983,
+        "returning": 6918
+      }
+    },
+    "chi2": 0.021679275550882088,
+    "p_value": 0.8829435059943082,
+    "dof": 1
+  },
+  "x_pre_balance": {
+    "mean_t": 1.0400150994849005,
+    "mean_c": 1.0469230616892762,
+    "diff": -0.006907962204375728,
+    "t": -0.4039552967040911,
+    "p_value": 0.6862499153642307,
+    "smd": -0.005713313838576314
+  },
+  "uni_x_pre": {
+    "mean": 1.043503275,
+    "median": 1.0828,
+    "std": 1.2090222401186959,
+    "p05": -1.029655,
+    "p95": 2.9565249999999996,
+    "skew": -0.16486013827321755,
+    "iqr_outlier_share": 0.00515
+  },
+  "uni_y_cont": {
+    "mean": 2.9544626700000003,
+    "median": 2.9915000000000003,
+    "std": 1.3806917410391286,
+    "p05": 0.6335600000000001,
+    "p95": 5.173179999999999,
+    "skew": -0.11029108525003044,
+    "iqr_outlier_share": 0.0064
+  },
+  "uni_tau_true": {
+    "mean": 0.23639000000000004,
+    "median": 0.08,
+    "std": 0.2384697282477684,
+    "p05": 0.08,
+    "p95": 0.6,
+    "skew": 0.8690441574919122,
+    "iqr_outlier_share": 0.0
+  },
+  "uni_y_bin": {
+    "mean": 0.7342,
+    "share_1": 0.7342
+  },
+  "cardinality": {
+    "segment": 2,
+    "treatment": 2,
+    "y_bin": 2,
+    "tau_true": 2
+  },
+  "corr_pearson": {
+    "x_pre": {
+      "x_pre": 1.0,
+      "y_cont": 0.6667,
+      "y_bin": 0.3226,
+      "treatment": -0.0029,
+      "tau_true": -0.5657
+    },
+    "y_cont": {
+      "x_pre": 0.6667,
+      "y_cont": 1.0,
+      "y_bin": 0.4739,
+      "treatment": 0.0979,
+      "tau_true": -0.4503
+    },
+    "y_bin": {
+      "x_pre": 0.3226,
+      "y_cont": 0.4739,
+      "y_bin": 1.0,
+      "treatment": 0.0479,
+      "tau_true": -0.2338
+    },
+    "treatment": {
+      "x_pre": -0.0029,
+      "y_cont": 0.0979,
+      "y_bin": 0.0479,
+      "treatment": 1.0,
+      "tau_true": 0.0012
+    },
+    "tau_true": {
+      "x_pre": -0.5657,
+      "y_cont": -0.4503,
+      "y_bin": -0.2338,
+      "treatment": 0.0012,
+      "tau_true": 1.0
+    }
+  },
+  "corr_spearman": {
+    "x_pre": {
+      "x_pre": 1.0,
+      "y_cont": 0.6539,
+      "y_bin": 0.3154,
+      "treatment": -0.0002,
+      "tau_true": -0.5637
+    },
+    "y_cont": {
+      "x_pre": 0.6539,
+      "y_cont": 1.0,
+      "y_bin": 0.467,
+      "treatment": 0.0904,
+      "tau_true": -0.4455
+    },
+    "y_bin": {
+      "x_pre": 0.3154,
+      "y_cont": 0.467,
+      "y_bin": 1.0,
+      "treatment": 0.0479,
+      "tau_true": -0.2338
+    },
+    "treatment": {
+      "x_pre": -0.0002,
+      "y_cont": 0.0904,
+      "y_bin": 0.0479,
+      "treatment": 1.0,
+      "tau_true": 0.0012
+    },
+    "tau_true": {
+      "x_pre": -0.5637,
+      "y_cont": -0.4455,
+      "y_bin": -0.2338,
+      "treatment": 0.0012,
+      "tau_true": 1.0
+    }
+  },
+  "corr_x_pre_y_cont": 0.6667378404402027,
+  "leakage": {
+    "features_in_model": [
+      "x_pre",
+      "segment"
+    ],
+    "tau_true_used_as_feature": false,
+    "corr_tau_x_pre": -0.5657049541243335,
+    "corr_tau_segment": 1.0,
+    "note": "tau_true is a deterministic function of `segment` (0.60 new / 0.08 returning); it is ground truth, not a feature. `segment` is a legitimate pre-treatment stratifier, so the model can recover tau_true only through the segment split — no leakage."
+  },
+  "cuped": {
+    "rho": 0.6667378404402027,
+    "theta": 0.7614081852155801,
+    "var_reduction_theory": 0.44453934787486515,
+    "var_reduction_actual": 0.44876683707901643,
+    "se_ratio": 0.7424507814804855,
+    "se_reduction_pct": 0.2575492185195145,
+    "ci_narrowing": 1.3468906289059972,
+    "naive": {
+      "ate": 0.27036715955130797,
+      "se": 0.01941875145267211,
+      "ci_low": 0.23230640670407063,
+      "ci_high": 0.3084279123985453,
+      "n_t": 9901,
+      "n_c": 10099
+    },
+    "cuped": {
+      "ate": 0.27562693851687925,
+      "se": 0.01441746719141172,
+      "ci_low": 0.24736870282171228,
+      "ci_high": 0.3038851742120462,
+      "n_t": 9901,
+      "n_c": 10099
+    },
+    "n_per_arm_for_same_power": 5512.331629209835
+  },
+  "ate_observed_y_cont": {
+    "ate": 0.27036715955130797,
+    "se": 0.01941875145267211,
+    "ci_low": 0.23230640670407063,
+    "ci_high": 0.3084279123985453,
+    "n_t": 9901,
+    "n_c": 10099
+  },
+  "ate_true_mean_tau": 0.23639000000000004,
+  "by_segment": {
+    "new": {
+      "n": 6015,
+      "n_t": 2983,
+      "n_c": 3032,
+      "tau_true": 0.6,
+      "y_cont_ate": {
+        "ate": 0.6399420031785212,
+        "se": 0.03142316662288926,
+        "ci_low": 0.5783525965976583,
+        "ci_high": 0.7015314097593842,
+        "n_t": 2983,
+        "n_c": 3032
+      },
+      "y_bin_control": 0.5217678100263852,
+      "y_bin_treatment": 0.6325846463291988,
+      "y_bin_gap": 0.11081683630281358,
+      "y_bin_gap_ci": [
+        0.08640642952986899,
+        0.1351600969699006
+      ],
+      "x_pre_mean": 0.0006412967581047338
+    },
+    "returning": {
+      "n": 13985,
+      "n_t": 6918,
+      "n_c": 7067,
+      "tau_true": 0.08,
+      "y_cont_ate": {
+        "ate": 0.1134502311907184,
+        "se": 0.02063062038787643,
+        "ci_low": 0.0730142152304806,
+        "ci_high": 0.1538862471509562,
+        "n_t": 6918,
+        "n_c": 7067
+      },
+      "y_bin_control": 0.7953870100466959,
+      "y_bin_treatment": 0.8086152067071408,
+      "y_bin_gap": 0.013228196660444946,
+      "y_bin_gap_ci": [
+        -0.0007370339352580686,
+        0.027558440148689533
+      ],
+      "x_pre_mean": 1.4920420521987845
+    }
+  },
+  "new_vs_returning_ratio": 8.377319989063885,
+  "new_vs_returning_tau_ratio": 7.5,
+  "by_treatment": {
+    "0": {
+      "n": 10099,
+      "y_cont_mean": 2.820617407664125,
+      "y_bin_mean": 0.713238934547975,
+      "x_pre_mean": 1.0469230616892762
+    },
+    "1": {
+      "n": 9901,
+      "y_cont_mean": 3.090984567215433,
+      "y_bin_mean": 0.7555802444197556,
+      "x_pre_mean": 1.0400150994849005
+    }
+  }
+}
