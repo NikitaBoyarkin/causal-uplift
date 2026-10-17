@@ -7,6 +7,8 @@
 - 🏦 [Flagship case: Volta neobank](https://github.com/NikitaBoyarkin/volta-banking)
 - 🧪 Related: [ab_test](https://github.com/NikitaBoyarkin/ab_test) · [causal-uplift](https://github.com/NikitaBoyarkin/causal-uplift) · [browser-mini-games](https://github.com/NikitaBoyarkin/browser-mini-games)
 
+**▶ [Diagram: CUPED variance cut and uplift targeting](docs/diagrams/causal-uplift.html)** — opens in a browser, no install, no build
+
 **On this page:** [Situation](#situation) · [Task](#task) · [Actions](#actions) · [Result](#result) · [What it shows](#what-it-shows) · [Data](#data) · [Methods](#methods) · [Quick start](#quick-start) · [Layout](#layout) · [Notes](#notes)
 
 ## Situation
