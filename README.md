@@ -1,47 +1,68 @@
 # Causal / Uplift
 
-> CUPED shrinks the standard error **~26%** (an experiment needing 10k users/arm now needs **~5.5k**); uplift modeling finds `new` users respond **~8×** more than `returning`.
+> CUPED сжимает стандартную ошибку на **~26%**: эксперименту, которому
+> требовалось 10 тыс. человек на группу, теперь хватает **~5,5 тыс.**
+> Uplift-моделирование показывает, что пользователи из сегмента `new`
+> откликаются **~8 раз** сильнее, чем `returning`.
 
 ## Navigation
+
 - 🌐 [Portfolio site](https://nikitaboyarkin.github.io)
 - 🏦 [Flagship case: Volta neobank](https://github.com/NikitaBoyarkin/volta-banking)
 - 🧪 Related: [ab_test](https://github.com/NikitaBoyarkin/ab_test) · [causal-uplift](https://github.com/NikitaBoyarkin/causal-uplift) · [browser-mini-games](https://github.com/NikitaBoyarkin/browser-mini-games)
 
-**▶ [Diagram: CUPED variance cut and uplift targeting](docs/diagrams/causal-uplift.html)** — opens in a browser, no install, no build
+**▶ [Diagram: CUPED variance cut and uplift targeting](docs/diagrams/causal-uplift.html)** — открывается в браузере, ничего ставить и собирать не нужно
 
 **On this page:** [Situation](#situation) · [Task](#task) · [Actions](#actions) · [Result](#result) · [What it shows](#what-it-shows) · [Data](#data) · [Methods](#methods) · [Quick start](#quick-start) · [Layout](#layout) · [Notes](#notes)
 
 ## Situation
-An A/B test that stops at "two-sample t-test on the outcome" leaves two questions on the table: how to buy power for free from data already collected, and who the treatment actually works on. The second question has no observable answer on real data — the individual treatment effect is the fundamental problem of causal inference — so a method claiming to recover it needs a ground truth to be checked against.
+
+A/B-тест, который заканчивается t-тестом на две выборки, оставляет без ответа
+два вопроса: как бесплатно добрать мощность из уже собранных данных и на кого
+именно действует вмешательство. У второго вопроса на реальных данных нет
+наблюдаемого ответа — индивидуальный эффект вмешательства и есть
+фундаментальная проблема каузального вывода. Значит, метод, который обещает его
+восстановить, нуждается в эталоне, с которым можно сверяться.
 
 ## Task
-Implement CUPED variance reduction and uplift modeling (ITE estimation) from scratch on a synthetic randomized experiment with a known, heterogeneous treatment effect, so the estimates can be compared against ground truth and a null reference.
+
+Реализовать с нуля сокращение дисперсии CUPED и uplift-моделирование (оценку
+ITE) на синтетическом рандомизированном эксперименте с известным неоднородным
+эффектом. Тогда оценки можно сравнить с истиной и с нулевым эталоном.
 
 ## Actions
-- Implement CUPED as `Y_adj = Y − θ·(X − mean(X))`, `θ = Cov(Y,X)/Var(X)`.
-- Implement T-learner and S-learner uplift models on LightGBM (no `causalml`/`econml` dependency).
-- Score with AUUC, Qini, uplift@top-20%, plus correlation with latent τ and per-segment recovery.
-- Guard each curve metric with a null distribution (200 seeded draws), a bootstrap CI, and a z-vs-null score.
-- Add an `oracle_tau` row — ranking by the known true effect — as the achievable ceiling.
+
+- CUPED как `Y_adj = Y − θ·(X − mean(X))`, где `θ = Cov(Y,X)/Var(X)`.
+- T-learner и S-learner на LightGBM — без зависимости от `causalml` и `econml`.
+- Метрики AUUC, Qini, uplift@top-20%, плюс корреляция со скрытым τ и
+  восстановление эффекта по сегментам.
+- Для каждой метрики-кривой — нулевое распределение (200 прогонов с зерном),
+  бутстрэп-интервал и z-оценка против нуля.
+- Строка `oracle_tau` — ранжирование по известному истинному эффекту — как
+  достижимый потолок.
 
 ## Result
-- **~26%** — CUPED standard-error reduction (×0.742), CI narrowing 1.35×.
-- **~5.5k** — users per arm now enough for the power 10k used to buy.
-- **0.449 vs 0.445** — actual vs theory (ρ²) variance reduction: the two agree.
-- **~8×** — the `new` vs `returning` response gap (0.1108 vs 0.0132).
-- **2.25σ** — the oracle ceiling vs null; the T-learner sits at 0.81σ, indistinguishable from random.
 
-Causal inference for product experiments — two methods that go beyond
-"two-sample t-test on the outcome":
+- **~26%** — настолько CUPED сокращает стандартную ошибку (×0,742), интервал
+  сужается в 1,35 раза.
+- **~5,5 тыс.** — столько человек на группу теперь хватает вместо прежних 10 тыс.
+- **0,449 против 0,445** — фактическое и теоретическое (ρ²) сокращение дисперсии
+  совпадают.
+- **~8 раз** — разрыв отклика между `new` и `returning` (0,1108 против 0,0132).
+- **2,25σ** — потолок оракула против нуля; T-learner держится на 0,81σ, то есть
+  не отличается от случайности.
 
-1. **CUPED** — variance reduction using a pre-period covariate. Same ATE,
-   smaller CI → experiments need fewer users to reach significance.
-2. **Uplift modeling** — estimate the *individual* treatment effect (ITE),
-   so retention/discount actions target users who actually respond, not
-   everyone.
+Каузальный вывод для продуктовых экспериментов — два метода, которые идут
+дальше «t-теста на две выборки»:
 
-Both run on a synthetic randomized A/B experiment with a known, heterogeneous
-treatment effect, so the estimates can be checked against ground truth.
+1. **CUPED** — сокращает дисперсию за счёт предпериодной ковариаты. ATE тот же,
+   интервал уже → для значимости нужно меньше пользователей.
+1. **Uplift-моделирование** — оценивает *индивидуальный* эффект вмешательства
+   (ITE), чтобы акции на удержание и скидки доставались тем, кто действительно
+   откликается, а не всем подряд.
+
+Оба метода работают на синтетическом рандомизированном A/B-эксперименте с
+известным неоднородным эффектом, поэтому оценки можно сверить с истиной.
 
 ## What it shows
 
@@ -52,15 +73,15 @@ treatment effect, so the estimates can be checked against ground truth.
 | Naive | 0.270 | 0.019 | [0.232, 0.308] |
 | CUPED | 0.276 | 0.014 | [0.247, 0.304] |
 
-The point estimate is unchanged within noise (0.270 → 0.276, shift 0.0053 —
-exactly the covariate imbalance `θ(x̄t − x̄c)`, which a perfectly balanced split
-would zero out). The standard error shrinks by ~26% (×0.742) and the CI narrows
-1.35×.
+Точечная оценка не меняется в пределах шума (0,270 → 0,276, сдвиг 0,0053 —
+ровно несбалансированность ковариаты `θ(x̄t − x̄c)`, которую идеально
+сбалансированное разбиение обнулило бы). Стандартная ошибка падает на ~26%
+(×0,742), интервал сужается в 1,35 раза.
 
-Variance reduction: **0.449 actual vs 0.445 theory (ρ²)** — the two agree, as
-they should: `x_pre` is a genuine pre-period covariate and the estimator is
-unbiased. Concretely, an experiment that needed 10k users per arm now needs
-**~5.5k** for the same power (10k × 0.742²).
+Сокращение дисперсии: **0,449 фактически против 0,445 по теории (ρ²)** — они
+совпадают, как и должны: `x_pre` — настоящая предпериодная ковариата, а оценка
+несмещённая. На практике эксперименту, которому требовалось 10 тыс. человек на
+группу, теперь хватает **~5,5 тыс.** при той же мощности (10 000 × 0,742²).
 
 ### Uplift (ITE recovery)
 
@@ -71,20 +92,22 @@ unbiased. Concretely, an experiment that needed 10k users per arm now needs
 | T-learner | 0.0043 | 0.81 | 0.0014 | 0.81 | 0.0724 | 0.495 | 0.458 |
 | Random | 0.0077 | 2.90 | 0.0048 | 2.90 | 0.0590 | 0.011 | 0.011 |
 
-Null reference (200 random scorers on the same test split): AUUC
-+0.00293 ± 0.00164, QINI +0.00009 ± 0.00164.
+Нулевой эталон (200 случайных скореров на том же тестовом сплите): AUUC
++0,00293 ± 0,00164, QINI +0,00009 ± 0,00164.
 
-The honest reading is **not** "both learners beat random". At n = 6000 the curve
-metrics are noise-dominated, and the table says so three ways:
+Честное прочтение — **не** «обе модели бьют случайность». При n = 6000 метрики
+на кривых утопают в шуме, и таблица говорит об этом трижды:
 
-- The T-learner sits at **0.81σ** — indistinguishable from random.
-- The S-learner is at **1.72σ** — marginal at best.
-- The **oracle**, which ranks users by the *known true* individual effect, is
-  only at **2.25σ**. That is the ceiling; nothing above it is achievable here.
-- The single seeded random scorer happens to land at **2.90σ**, above both real
-  learners. That is what a ±0.0016 null looks like when you draw from it once.
+- T-learner стоит на **0,81σ** — от случайности не отличить.
+- S-learner на **1,72σ** — в лучшем случае на грани.
+- **Оракул**, который ранжирует по *известному истинному* индивидуальному
+  эффекту, — только **2,25σ**. Это потолок; выше здесь ничего не достижимо.
+- Единственный затравленный случайный скорер случайно попадает на **2,90σ** —
+  выше обеих настоящих моделей. Так и выглядит нуль с разбросом ±0,0016, если
+  вытянуть из него одно значение.
 
-Every 95% bootstrap interval straddles zero and overlaps every other model:
+Каждый 95% бутстрэп-интервал накрывает ноль и пересекается со всеми остальными
+моделями:
 
 | Model | AUUC 95% CI | QINI 95% CI | uplift@20% 95% CI |
 |---|---|---|---|
@@ -93,74 +116,77 @@ Every 95% bootstrap interval straddles zero and overlaps every other model:
 | T-learner | [−0.0026, 0.0114] | [−0.0017, 0.0050] | [0.0187, 0.1311] |
 | Random | [0.0014, 0.0139] | [0.0015, 0.0081] | [0.0063, 0.1068] |
 
-What *is* statistically clear at this sample size is the **ranking quality** and
-the **segment split**, both of which have a reference that is not noise:
+Статистически ясны при таком размере выборки **качество ранжирования** и
+**разбиение по сегментам** — у обоих есть эталон, который не шум:
 
 | Segment | Empirical gap (95% CI) | T-learner | S-learner | n (test) |
 |---|---|---|---|---|
 | `new` | 0.1108 [0.0894, 0.1357] | 0.126 | 0.120 | 1782 |
 | `returning` | 0.0132 [−0.0013, 0.0271] | 0.018 | 0.019 | 4218 |
 
-`corr(τ)` is 0.50–0.66 against 0.011 for random, and the model recovers that
-"new" users respond ~8× more than "returning" users — the targeting signal a
-discount campaign would act on. Note the reference CI: the predicted means
-(a 6k test split) and the reference (the full 20k) carry separate sampling
-error, so `abs_err ≈ 0.015` means little until the intervals are compared —
-they overlap comfortably.
+`corr(τ)` равна 0,50–0,66 против 0,011 у случайности, и модель восстанавливает
+то, что «новые» откликаются ~8 раз сильнее «возвращающихся», — сигнал для
+таргетинга, на который опиралась бы кампания со скидками. Обратите внимание на
+интервал эталона: предсказанные средние (тестовый сплит на 6 тыс.) и эталон (все
+20 тыс.) несут разную ошибку выборки, поэтому `abs_err ≈ 0,015` мало что значит,
+пока не сравнишь интервалы, — а они спокойно пересекаются.
 
-Two footnotes on honesty:
+Две сноски про честность:
 
-- The latent ground-truth τ is 0.60 (`new`) / 0.08 (`returning`), but the
-  *conversion* uplift is ~0.11 / 0.01 because the sigmoid at a high baseline
-  conversion (~71%) damps large latent effects. Comparing predicted binary
-  uplift to latent τ would be a scale mismatch; the binary comparison above is
-  on the same scale.
-- `tau_true` takes only **two** values (one per segment), so `corr(τ)` is a
-  between-segment point-biserial correlation, not a within-segment ITE ranking.
-  Both Pearson and rank versions are reported; they differ only in tie handling.
+- Скрытый истинный τ равен 0,60 (`new`) и 0,08 (`returning`), но
+  *конверсионный* uplift — около 0,11 и 0,01, потому что сигмоида при высоком
+  базовом уровне конверсии (~71%) гасит большие скрытые эффекты. Сравнивать
+  предсказанный бинарный uplift со скрытым τ — это сравнение разных шкал;
+  сравнение выше идёт в одной шкале.
+- `tau_true` принимает всего **два** значения (по одному на сегмент), поэтому
+  `corr(τ)` — точечно-биссериальная корреляция между сегментами, а не
+  ранжирование ITE внутри сегмента. Приведены обе версии, Пирсона и ранговая;
+  различаются они только обработкой совпадений.
 
 ## Data
 
-Synthetic, deterministic (seed = 42). 20,000 users in a randomized experiment:
+Синтетика, детерминированная (seed = 42). 20 000 человек в рандомизированном
+эксперименте:
 
-- `segment` — `new` (30%) / `returning` (70%) → heterogeneous treatment effect.
-- `x_pre` — pre-period covariate, correlated with the outcome (ρ ≈ 0.67).
-- `treatment` — 50/50, independent of everything (clean randomization).
-- `tau_true` — the ground-truth individual treatment effect (eval only; must never
-  enter the feature set — that would be leakage).
-- `y_cont` — continuous outcome; `y_bin` — binary conversion.
+- `segment` — `new` (30%) и `returning` (70%) → неоднородный эффект
+  вмешательства.
+- `x_pre` — предпериодная ковариата, коррелирует с исходом (ρ ≈ 0,67).
+- `treatment` — 50/50, независим от всего остального (чистая рандомизация).
+- `tau_true` — истинный индивидуальный эффект (только для оценки; в признаки
+  попадать не должен — это утечка).
+- `y_cont` — непрерывный исход; `y_bin` — бинарная конверсия.
 
 ## Methods
 
-- **CUPED**: `Y_adj = Y − θ·(X − mean(X))`, `θ = Cov(Y,X)/Var(X)`. The ATE
-  estimate on `Y_adj` has the same expectation and ~`(1 − ρ²)` of the variance,
-  i.e. a variance *reduction* of `ρ²`.
-- **T-learner**: one model per treatment arm; uplift = `P(t=1) − P(t=0)`.
-- **S-learner**: one model with `treatment` as a feature;
+- **CUPED**: `Y_adj = Y − θ·(X − mean(X))`, где `θ = Cov(Y,X)/Var(X)`. Оценка
+  ATE на `Y_adj` имеет то же матожидание и примерно `(1 − ρ²)` дисперсии, то
+  есть сокращение дисперсии на `ρ²`.
+- **T-learner**: отдельная модель на каждую группу; uplift = `P(t=1) − P(t=0)`.
+- **S-learner**: одна модель, где `treatment` — обычный признак;
   uplift = `pred(t=1) − pred(t=0)`.
-- **Evaluation**: AUUC, Qini coefficient, uplift@top-20%, correlation with
-  latent τ, and per-segment empirical recovery — each paired with a reference.
+- **Оценка**: AUUC, коэффициент Qini, uplift@top-20%, корреляция со скрытым τ и
+  эмпирическое восстановление по сегментам — каждое с эталоном.
 
 ### Reading a curve metric honestly
 
-Three helpers in `src/eval.py` keep the curve metrics from being read as
-evidence on their own:
+Три помощника в `src/eval.py` не дают читать метрики-кривые как самостоятельное
+доказательство:
 
-- `metric_null(y, w, fn)` — the metric's distribution under *random* scoring
-  (200 draws, seeded). Note AUUC is **not** centered at zero: because the curve
-  uses a running `cum_t/cum_c` ratio, a random scorer's AUUC sits near `C/(2n)`,
-  so a raw AUUC carries a positive offset.
-- `bootstrap_ci(fn, uplift, y, w)` — percentile interval on the test split.
-- `z_vs_null(value, null)` — how many null SDs above random the value sits.
+- `metric_null(y, w, fn)` — распределение метрики при *случайном* скоринге
+  (200 прогонов с зерном). Заметьте: AUUC **не** центрирована в нуле — кривая
+  использует накопленное отношение `cum_t/cum_c`, поэтому у случайного скорера
+  AUUC держится около `C/(2n)`, и сырое значение несёт положительное смещение.
+- `bootstrap_ci(fn, uplift, y, w)` — перцентильный интервал на тестовом сплите.
+- `z_vs_null(value, null)` — на сколько нулевых СКО значение выше случайности.
 
-`run.py` prints all three per model, plus an `oracle_tau` row (ranking by the
-known τ) as the achievable ceiling. It also writes `metrics.json` with
-`allow_nan=False`, so an undefined metric fails loudly instead of emitting
-invalid JSON.
+`run.py` печатает все три по каждой модели и добавляет строку `oracle_tau`
+(ранжирование по известному τ) как достижимый потолок. Ещё он пишет
+`metrics.json` с `allow_nan=False`: неопределённая метрика падает громко, а не
+выдаёт невалидный JSON.
 
-Implemented from scratch on LightGBM (no `causalml`/`econml` dependency) so the
-mechanics are visible. In production these would be `econml`'s
-`T Learner` / `X Learner` or `causalml`'s uplift forests.
+Всё реализовано с нуля на LightGBM (без `causalml` и `econml`), чтобы механика
+была видна. В продакшене здесь были бы `T Learner` и `X Learner` из `econml`
+или uplift-леса из `causalml`.
 
 ## Quick start
 
@@ -172,24 +198,24 @@ uv run pytest -q                      # 23 tests
 uv run ruff check .                   # lint
 ```
 
-Options: `--n-boot` (bootstrap resamples, 400) and `--n-null` (null draws, 200)
-trade runtime for tighter references.
+Опции `--n-boot` (бутстрэп-ресемплы, 400) и `--n-null` (нулевые прогоны, 200)
+меняют время работы на более плотные эталоны.
 
-Outputs: `reports/metrics.json` + `reports/uplift.png` (QINI curves + segment
-uplift against the empirical gap, with its CI).
+Что на выходе: `reports/metrics.json` и `reports/uplift.png` — кривые QINI плюс
+uplift по сегментам против эмпирического разрыва с его интервалом.
 
 ## Layout
 
 ```
 causal-uplift/
-├── data/generate_data.py      # synthetic randomized experiment + HTE
+├── data/generate_data.py      # synthetic experiment + HTE
 ├── src/
 │   ├── config.py              # seed + LGBM learner params
 │   ├── cuped.py               # CUPED adjustment + ATE/SE
 │   ├── uplift.py              # T-learner / S-learner
-│   └── eval.py                # AUUC, QINI, uplift@k, recovery, null/CI
-├── tests/                     # 23 tests incl. mutation-verified guards
-├── reports/                   # metrics.json + uplift.png (generated, gitignored)
+│   └── eval.py                # AUUC, QINI, uplift@k, null/CI
+├── tests/                     # 23 tests, mutation-verified guards
+├── reports/                   # metrics.json + uplift.png (gitignored)
 ├── run.py                     # CLI
 ├── uv.lock                    # committed: reproducible environment
 └── pyproject.toml
@@ -197,15 +223,14 @@ causal-uplift/
 
 ## Notes
 
-- CUPED buys power for free if you have a pre-period covariate — no new
-  experiment design, just a better estimator on data you already collected.
-- Uplift modeling answers a different question than A/B testing: not "does the
-  treatment work on average" but "who does it work on." The two are
-  complementary, not substitutes.
-- The synthetic data has a true heterogeneous effect, which is the only reason
-  recovery can be checked. On real data you never observe the ITE — that is the
-  fundamental problem of causal inference.
-- The most transferable lesson here is the sample-size one: with ~6k test rows
-  and a ~30% baseline conversion, AUUC/QINI cannot separate a *perfect* ranker
-  from noise. Reporting a bare QINI without a null reference would have made the
-  T-learner look like a real result.
+- CUPED даёт мощность бесплатно, если есть предпериодная ковариата: новый
+  дизайн эксперимента не нужен, просто оценка получше на уже собранных данных.
+- Uplift-моделирование отвечает на другой вопрос, чем A/B-тест: не «работает ли
+  вмешательство в среднем», а «на ком оно работает». Методы дополняют друг
+  друга, а не заменяют.
+- У синтетических данных есть настоящий неоднородный эффект — только поэтому
+  восстановление можно проверить. На реальных данных ITE не наблюдается
+  никогда: в этом и состоит фундаментальная проблема каузального вывода.
+- Самый переносимый урок — про размер выборки: при ~6 тыс. тестовых строк и
+  базовой конверсии ~30% AUUC и QINI не отличают *идеальный* ранкер от шума.
+  Голый QINI без нулевого эталона выставил бы T-learner настоящим результатом.
