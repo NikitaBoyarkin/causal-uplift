@@ -263,22 +263,33 @@ def test_learners_honour_the_requested_outcome_column():
 # --- end to end --------------------------------------------------------------
 
 def test_cli_writes_valid_json_and_plot(tmp_path):
-    """Drives run.py from a foreign cwd; json.loads rejects a bare NaN.
+    """Drives run.py from a foreign cwd into a scratch out-dir.
 
-    Artifacts are removed first: asserting they merely *exist* would pass off a
-    stale file left by an earlier run.
+    json.loads rejects a bare NaN. Writing to `tmp_path` keeps the committed
+    reproducibility reference (reports/reference/metrics.json) out of the test's
+    blast radius, so a test run can never leave the artifact drifted.
     """
-    for name in ("metrics.json", "uplift.png"):
-        (ROOT / "reports" / name).unlink(missing_ok=True)
+    out_dir = tmp_path / "reports"
     proc = subprocess.run(
-        [sys.executable, str(ROOT / "run.py"), "--n-boot", "20", "--n-null", "20"],
+        [sys.executable, str(ROOT / "run.py"), "--out-dir", str(out_dir),
+         "--n-boot", "20", "--n-null", "20"],
         cwd=tmp_path, capture_output=True, text=True, timeout=600,
     )
     assert proc.returncode == 0, proc.stderr[-2000:]
-    out = json.loads((ROOT / "reports" / "metrics.json").read_text())
-    assert set(out) >= {"cuped", "uplift", "null", "n"}
+    assert "=== Decision (pre-registered rule) ===" in proc.stdout
+    out = json.loads((out_dir / "metrics.json").read_text())
+    assert set(out) >= {"cuped", "uplift", "null", "n", "data", "decision", "preregistration"}
     assert set(out["uplift"]) >= {"oracle_tau", "t_learner", "s_learner", "random"}
     for row in out["uplift"].values():
         for key in ("auuc", "qini", "uplift_at_top20"):
             assert np.isfinite(row[key])
-    assert (ROOT / "reports" / "uplift.png").exists()
+    assert (out_dir / "uplift.png").exists()
+
+    decision = out["decision"]
+    assert decision["decision"] in {"ship", "no_ship", "inconclusive"}
+    assert decision["break_even_uplift"] == pytest.approx(0.05)
+    assert set(decision["cost_of_error"]) == {
+        "ship_if_no_effect", "no_ship_if_effect", "worst_case_total",
+    }
+    assert len(out["preregistration"]["sha256"]) == 64
+    assert len(out["data"]["sha256"]) == 64

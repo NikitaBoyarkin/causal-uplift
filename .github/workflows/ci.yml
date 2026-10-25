@@ -20,5 +20,11 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
+      - name: Lint
+        run: uv run ruff check run.py src tests scripts data
+
       - name: Run tests
         run: uv run pytest -q
+
+      - name: Reproduce results artifact
+        run: uv run python scripts/reproduce.py --workdir "$RUNNER_TEMP/repro"

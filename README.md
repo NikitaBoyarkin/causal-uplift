@@ -13,7 +13,7 @@
 
 **▶ [Diagram: CUPED variance cut and uplift targeting](docs/diagrams/causal-uplift.html)** — открывается в браузере, ничего ставить и собирать не нужно
 
-**On this page:** [Situation](#situation) · [Task](#task) · [Actions](#actions) · [Result](#result) · [What it shows](#what-it-shows) · [Data](#data) · [Methods](#methods) · [Quick start](#quick-start) · [Layout](#layout) · [Notes](#notes)
+**On this page:** [Situation](#situation) · [Task](#task) · [Actions](#actions) · [Result](#result) · [What it shows](#what-it-shows) · [Data](#data) · [Methods](#methods) · [Quick start](#quick-start) · [Pre-registration](#pre-registration--ship-decision) · [Reproducibility](#reproducibility) · [Layout](#layout) · [Notes](#notes)
 
 ## Situation
 
@@ -51,6 +51,9 @@ ITE) на синтетическом рандомизированном эксп
 - **~8 раз** — разрыв отклика между `new` и `returning` (0,1108 против 0,0132).
 - **2,25σ** — потолок оракула против нуля; T-learner держится на 0,81σ, то есть
   не отличается от случайности.
+- **ship** — пред-регистрированное правило (break-even 0,05) отправляет кампанию
+  на `new` в прод: нижняя граница CI 0,0894 выше порога. Для `returning` тот же
+  расчёт даёт `no_ship`.
 
 Каузальный вывод для продуктовых экспериментов — два метода, которые идут
 дальше «t-теста на две выборки»:
@@ -192,31 +195,93 @@ ITE) на синтетическом рандомизированном эксп
 
 ```bash
 uv sync
-uv run python data/generate_data.py   # writes data/experiment.csv
-uv run python run.py                  # prints tables, writes reports/
-uv run pytest -q                      # 23 tests
-uv run ruff check .                   # lint
+uv run python run.py                  # CSV generated automatically when absent
+uv run pytest -q                      # 53 tests
+uv run ruff check run.py src tests scripts data
+uv run python scripts/reproduce.py    # regenerate + diff the committed artifact
 ```
 
-Опции `--n-boot` (бутстрэп-ресемплы, 400) и `--n-null` (нулевые прогоны, 200)
-меняют время работы на более плотные эталоны.
+`run.py` сам пишет `data/experiment.csv`, если файла нет (seed = 42, 20 000
+строк), — отдельный шаг подготовки не нужен. Опции `--data-path` и `--out-dir`
+перенаправляют вход и выход; `--n-boot` (бутстрэп-ресемплы, 400) и `--n-null`
+(нулевые прогоны, 200) меняют время работы на более плотные эталоны.
+`--data-seed` нужен только тому, кто сгенерировал CSV сам (так делает
+`scripts/reproduce.py`): без него готовый файл не приписывается сиду.
 
-Что на выходе: `reports/metrics.json` и `reports/uplift.png` — кривые QINI плюс
-uplift по сегментам против эмпирического разрыва с его интервалом.
+Что на выходе: `reports/metrics.json`, `reports/uplift.png` — кривые QINI плюс
+uplift по сегментам против эмпирического разрыва с его интервалом — и вердикт
+`ship / no_ship` в консоли и в JSON.
+
+## Pre-registration & ship decision
+
+Правило решения зафиксировано **до** анализа в `docs/preregistration.md` и
+продублировано константами в `src/config.py`; тест связывает документ и код.
+Вердикт считается по эмпирическому разрыву конверсии в сегменте `new`, а не по
+AUUC/QINI: на этом n метрики кривых шум-доминированы и права голоса не имеют.
+
+Кампания окупается, если uplift выше break-even =
+`campaign_cost_per_user / value_per_conversion` = 2 / 40 = **0,05**.
+
+| Величина | Значение |
+|---|---|
+| Наблюдаемый uplift (`new`) | 0,1108 |
+| 95% CI | [0,0894, 0,1357] |
+| Break-even | 0,05 |
+| Вердикт | **ship** (нижняя граница CI выше break-even) |
+| Целевая аудитория | 6 015 человек |
+| Чистая ценность на пользователя | +2,43 |
+| Цена ошибки: ship без эффекта | 12 030 |
+| Цена ошибки: no-ship при эффекте | 14 633 |
+
+Цена ошибки — деньги: потраченный впустую бюджет кампании против упущенной
+прибыли (формулы в пред-регистрации). Для `returning` (0,0132, CI
+[−0,0013, 0,0271]) то же правило даёт `no_ship`: верхняя граница ниже
+break-even. Вердикт детерминирован и хранится в `metrics.json` под ключом
+`decision`, а не только печатается.
+
+## Reproducibility
+
+`reports/metrics.json` не коммитится, а его эталон
+**`reports/reference/metrics.json`** — да. Одна команда проверяет, что
+результат воспроизводится из генератора:
+
+```bash
+uv run python scripts/reproduce.py
+```
+
+Она заново пишет CSV из seed = 42, прогоняет пайплайн в scratch-каталог и
+сравнивает свежий `metrics.json` с эталоном по каждому ключу (`rtol = 1e-6`).
+Код возврата: `0` — совпало, `1` — расхождение, `2` — эталона нет.
+
+Артефакт хранит провенанс: `data.sha256` (хеш CSV), `data.seed` и хеш
+`docs/preregistration.md`. Поэтому правка пред-регистрации после прогона ломает
+воспроизведение — правило нельзя переписать задним числом незаметно. Обновить
+эталон после осознанного изменения:
+
+```bash
+uv run python scripts/reproduce.py --write-reference
+```
+
+`pytest` пишет свои артефакты во временный каталог (`--out-dir tmp_path`),
+поэтому прогон тестов не может незаметно сдвинуть эталон.
 
 ## Layout
 
 ```
 causal-uplift/
-├── data/generate_data.py      # synthetic experiment + HTE
+├── data/generate_data.py      # synthetic experiment + HTE (importable API)
 ├── src/
-│   ├── config.py              # seed + LGBM learner params
+│   ├── config.py              # seed, LGBM params, pre-registered decision constants
 │   ├── cuped.py               # CUPED adjustment + ATE/SE
 │   ├── uplift.py              # T-learner / S-learner
+│   ├── decision.py            # ship / no_ship / inconclusive + cost of error
 │   └── eval.py                # AUUC, QINI, uplift@k, null/CI
-├── tests/                     # 23 tests, mutation-verified guards
+├── docs/preregistration.md    # decision rule fixed before the analysis
+├── scripts/reproduce.py       # regenerate + diff the reference artifact
+├── tests/                     # 53 tests, mutation-verified guards
 ├── reports/                   # metrics.json + uplift.png (gitignored)
-├── run.py                     # CLI
+│   └── reference/             # committed metrics.json: reproducibility baseline
+├── run.py                     # CLI (bootstraps the CSV when absent)
 ├── uv.lock                    # committed: reproducible environment
 └── pyproject.toml
 ```
