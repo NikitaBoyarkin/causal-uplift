@@ -12,8 +12,11 @@ from src.decision import INCONCLUSIVE, NO_SHIP, SHIP, break_even_uplift, ship_de
 ROOT = pathlib.Path(__file__).parent.parent
 
 
-def _seg(value: float, lo: float, hi: float, n_t: int = 3000, n_c: int = 3000) -> dict:
-    return {"value": value, "lo": lo, "hi": hi, "n_t": n_t, "n_c": n_c, "n_total": n_t + n_c}
+def _seg(value: float, lo: float, hi: float, n_t: int = 3000, n_c: int = 3000,
+         n_total: int = 20000) -> dict:
+    """Shape of one `eval.segment_truth` entry: `n_total` is the whole frame (20k),
+    while `n_t + n_c` is only the segment's arms (~6k for `new`)."""
+    return {"value": value, "lo": lo, "hi": hi, "n_t": n_t, "n_c": n_c, "n_total": n_total}
 
 
 def test_break_even_is_cost_over_value():
@@ -54,6 +57,24 @@ def test_cost_of_error_uses_the_real_numbers():
     assert err["ship_if_no_effect"]["total"] == pytest.approx(2 * n)
     assert err["no_ship_if_effect"]["total"] == pytest.approx((0.1108 * 40 - 2) * n)
     assert err["worst_case_total"] == pytest.approx((0.1108 * 40 - 2) * n)
+
+
+def test_n_target_is_the_segment_arms_not_the_frame_total():
+    """`n_total=20000` must not size the campaign; `n_t + n_c` must."""
+    r = ship_decision({"new": _seg(0.11, 0.09, 0.13)})
+    assert r["n_target"] == 6000 == 3000 + 3000
+    assert r["n_target"] != 20000
+
+
+def test_segment_without_per_arm_counts_raises():
+    """Zero or absent per-arm counts must fail, never fall back to the frame total."""
+    zero = _seg(0.11, 0.09, 0.13, n_t=0, n_c=0)
+    with pytest.raises(ValueError, match="no per-arm counts"):
+        ship_decision({"new": zero})
+
+    absent = {"value": 0.11, "lo": 0.09, "hi": 0.13, "n_total": 20000}
+    with pytest.raises(ValueError, match="no per-arm counts"):
+        ship_decision({"new": absent})
 
 
 def test_missing_target_segment_raises():

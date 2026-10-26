@@ -55,7 +55,16 @@ def s_learner(train: pd.DataFrame, test: pd.DataFrame, y_col: str = "y_bin") -> 
 
 
 def random_uplift(test: pd.DataFrame, seed: int = C.SEED) -> np.ndarray:
-    return np.random.default_rng(seed).random(len(test))
+    """Uniform random scores, the baseline the learners are measured against.
+
+    The generator is offset from `seed` on purpose: `metric_null` draws its null
+    distribution from `default_rng(C.SEED)`, whose first draw is exactly this
+    array when the seeds match. The baseline must not be a *member* of the null
+    distribution it is compared against -- with the shared seed the "random" row
+    was literally null draw #1, i.e. the maximum of the 200 draws (z=+2.90), and
+    it outranked the oracle, contradicting the oracle-is-the-ceiling claim.
+    """
+    return np.random.default_rng(seed + 1).random(len(test))
 
 
 def run_uplift(df: pd.DataFrame, y_bin: str = "y_bin") -> dict:
