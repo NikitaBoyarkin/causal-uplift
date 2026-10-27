@@ -9,6 +9,7 @@ null. A bare QINI with no reference is not evidence of anything.
 
 All functions accept numpy arrays or pandas Series.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -25,12 +26,24 @@ def _rank(x: np.ndarray) -> np.ndarray:
 
 
 def _curve(uplift, y, w) -> pd.DataFrame:
-    """Sort by predicted uplift desc; cumulative incremental responders."""
-    df = pd.DataFrame({
-        "u": np.asarray(uplift, dtype=float),
-        "y": np.asarray(y, dtype=float),
-        "w": np.asarray(w, dtype=float),
-    }).sort_values("u", ascending=False)
+    """Sort by predicted uplift desc; cumulative incremental responders.
+
+    Ties are broken by the row's position in the input, explicitly and as a
+    second sort key. A bare ``sort_values("u")`` lets the sort algorithm decide
+    the order of a tied block: the oracle score takes two values, so ~6000 of
+    6000 test rows are tied and quicksort vs a stable sort moved the oracle AUUC
+    between 0.00661 and 0.00608. The tiebreak makes the curve independent of the
+    sort implementation.
+    """
+    df = pd.DataFrame(
+        {
+            "u": np.asarray(uplift, dtype=float),
+            "y": np.asarray(y, dtype=float),
+            "w": np.asarray(w, dtype=float),
+            "row": np.arange(len(uplift)),
+        }
+    ).sort_values(["u", "row"], ascending=[False, True])
+    df = df.drop(columns="row")
     df["cum_t"] = (df.w == 1).cumsum()
     df["cum_c"] = (df.w == 0).cumsum()
     df["cum_y_t"] = ((df.w == 1) & (df.y == 1)).cumsum()
@@ -81,7 +94,10 @@ def uplift_at_top_k(uplift, y, w, k_frac: float = 0.20) -> float:
     yv = np.asarray(y, dtype=float)
     wv = np.asarray(w)
     n_top = max(1, int(len(yv) * k_frac))
-    idx = np.argsort(u)[::-1][:n_top]
+    # Descending score, ties by input position (same rule as `_curve`): a plain
+    # argsort leaves tied rows to the algorithm, so the top-k subset - and the
+    # metric - changed with the sort implementation.
+    idx = np.lexsort((np.arange(len(u)), -u))[:n_top]
     ytop, wtop = yv[idx], wv[idx]
     t, c = (wtop == 1), (wtop == 0)
     if t.sum() == 0 or c.sum() == 0:
@@ -108,8 +124,13 @@ def ite_recovery(uplift, test: pd.DataFrame) -> dict:
     }
 
 
-def segment_truth(ref: pd.DataFrame, segments=None, n_boot: int = 200,
-                  seed: int = C.SEED) -> dict:
+def segment_truth(
+    ref: pd.DataFrame,
+    segments=None,
+    n_boot: int = 200,
+    seed: int = C.SEED,
+    ci_level: float | None = None,
+) -> dict:
     """Empirical per-segment conversion gap (treatment - control) with a CI.
 
     This is the reference the predicted *binary* uplift is compared against -
@@ -121,6 +142,7 @@ def segment_truth(ref: pd.DataFrame, segments=None, n_boot: int = 200,
     if segments is None:
         segments = tuple(sorted(ref["segment"].unique()))
     segments = tuple(segments)
+    lo_pct, hi_pct = C.ci_percentiles(ci_level)
     rng = np.random.default_rng(seed)
     n = len(ref)
     out = {}
@@ -137,15 +159,23 @@ def segment_truth(ref: pd.DataFrame, segments=None, n_boot: int = 200,
             draws[i] = ti.mean() - ci_.mean()
         out[seg] = {
             "value": float(t.mean() - c.mean()),
-            "lo": float(np.percentile(draws, 2.5)),
-            "hi": float(np.percentile(draws, 97.5)),
-            "n_t": len(t), "n_c": len(c), "n_total": n,
+            "lo": float(np.percentile(draws, lo_pct)),
+            "hi": float(np.percentile(draws, hi_pct)),
+            "n_t": len(t),
+            "n_c": len(c),
+            "n_total": n,
         }
     return out
 
 
-def segment_uplift(uplift, test: pd.DataFrame, truth: dict, n_boot: int = 200,
-                   seed: int = C.SEED) -> dict:
+def segment_uplift(
+    uplift,
+    test: pd.DataFrame,
+    truth: dict,
+    n_boot: int = 200,
+    seed: int = C.SEED,
+    ci_level: float | None = None,
+) -> dict:
     """Mean predicted uplift per segment vs the empirical gap from `segment_truth`.
 
     The reference CI is reported alongside, because the predicted mean (6k test
@@ -154,19 +184,23 @@ def segment_uplift(uplift, test: pd.DataFrame, truth: dict, n_boot: int = 200,
     """
     u = np.asarray(uplift, dtype=float)
     s = pd.Series(u, index=test.index)
+    lo_pct, hi_pct = C.ci_percentiles(ci_level)
     rng = np.random.default_rng(seed)
     out = {}
     for seg, ref in truth.items():
         vals = s[test.segment == seg].to_numpy()
         if vals.size == 0:
             raise ValueError(f"segment {seg!r} absent from the test split")
-        draws = np.array([vals[rng.integers(0, len(vals), len(vals))].mean()
-                          for _ in range(n_boot)])
+        draws = np.array(
+            [vals[rng.integers(0, len(vals), len(vals))].mean() for _ in range(n_boot)]
+        )
         pred = float(vals.mean())
         out[seg] = {
             "predicted": round(pred, 4),
-            "predicted_ci": [round(float(np.percentile(draws, 2.5)), 4),
-                             round(float(np.percentile(draws, 97.5)), 4)],
+            "predicted_ci": [
+                round(float(np.percentile(draws, lo_pct)), 4),
+                round(float(np.percentile(draws, hi_pct)), 4),
+            ],
             "ground_truth": round(ref["value"], 4),
             "ground_truth_ci": [round(ref["lo"], 4), round(ref["hi"], 4)],
             "abs_err": round(abs(pred - ref["value"]), 4),
@@ -181,6 +215,11 @@ def metric_null(y, w, fn, n_draws: int = 200, seed: int = C.SEED) -> dict:
     Deterministic given `seed`. Note AUUC is *not* centered at zero here: with
     the running `cum_t/cum_c` ratio the random reference sits near C/(2n), so a
     raw AUUC carries a positive offset and must be read against this null.
+
+    ``q025``/``q975`` are a fixed 2.5/97.5 reference band for the null
+    distribution itself, not a confidence interval for an estimate: they stay
+    fixed when ``DECISION['ci_level']`` changes, which is why the keys are named
+    after the quantiles rather than after a level.
     """
     yv, wv = np.asarray(y), np.asarray(w)
     rng = np.random.default_rng(seed)
@@ -195,10 +234,13 @@ def metric_null(y, w, fn, n_draws: int = 200, seed: int = C.SEED) -> dict:
     }
 
 
-def bootstrap_ci(fn, uplift, y, w, n_boot: int = 400, seed: int = C.SEED) -> dict:
+def bootstrap_ci(
+    fn, uplift, y, w, n_boot: int = 400, seed: int = C.SEED, ci_level: float | None = None
+) -> dict:
     """Percentile bootstrap interval for a curve metric on (uplift, y, w)."""
     u = np.asarray(uplift, dtype=float)
     yv, wv = np.asarray(y), np.asarray(w)
+    lo_pct, hi_pct = C.ci_percentiles(ci_level)
     rng = np.random.default_rng(seed)
     n = len(yv)
     vals = np.empty(n_boot)
@@ -206,8 +248,8 @@ def bootstrap_ci(fn, uplift, y, w, n_boot: int = 400, seed: int = C.SEED) -> dic
         idx = rng.integers(0, n, n)
         vals[i] = fn(u[idx], yv[idx], wv[idx])
     return {
-        "lo": float(np.percentile(vals, 2.5)),
-        "hi": float(np.percentile(vals, 97.5)),
+        "lo": float(np.percentile(vals, lo_pct)),
+        "hi": float(np.percentile(vals, hi_pct)),
         "sd": float(vals.std(ddof=1)),
     }
 

@@ -9,6 +9,7 @@ Two simple, dependency-light learners built on LightGBM:
 Evaluated against ground-truth `tau_true` (available in synthetic data) and via
 AUUC / QINI / uplift@top-k on a held-out test split.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -75,7 +76,10 @@ def run_uplift(df: pd.DataFrame, y_bin: str = "y_bin") -> dict:
     up_s = s_learner(train, test, y_bin)
     up_r = random_uplift(test)
     return {
-        "train_n": len(train), "test_n": len(test),
-        "t_learner": up_t, "s_learner": up_s, "random": up_r,
+        "train_n": len(train),
+        "test_n": len(test),
+        "t_learner": up_t,
+        "s_learner": up_s,
+        "random": up_r,
         "test": test.reset_index(drop=True),
     }

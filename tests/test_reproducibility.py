@@ -5,6 +5,7 @@ pipeline twice through ``run_reproduction`` (n_boot=10, n_null=10) - about 15 s
 in total on a laptop - and asserts the two ``metrics.json`` files are identical
 at rtol=1e-9.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -46,7 +47,9 @@ def test_float_outside_tolerance_reports_dotted_path():
     candidate = {"uplift": {"t_learner": {"auuc": 0.6}}}
     result = compare_metrics(reference, candidate)
     assert result["ok"] is False
-    assert result["diffs"] == [{"path": "uplift.t_learner.auuc", "reference": 0.5, "candidate": 0.6}]
+    assert result["diffs"] == [
+        {"path": "uplift.t_learner.auuc", "reference": 0.5, "candidate": 0.6}
+    ]
 
 
 def test_tight_rtol_flags_tiny_float_drift():
@@ -136,12 +139,20 @@ def test_cli_exits_2_when_reference_is_missing(tmp_path):
     workdir = tmp_path / "workdir"
     proc = subprocess.run(
         [
-            sys.executable, str(SCRIPT),
-            "--reference", str(missing),
-            "--workdir", str(workdir),
-            "--n-boot", "2", "--n-null", "2",
+            sys.executable,
+            str(SCRIPT),
+            "--reference",
+            str(missing),
+            "--workdir",
+            str(workdir),
+            "--n-boot",
+            "2",
+            "--n-null",
+            "2",
         ],
-        capture_output=True, text=True, timeout=120,
+        capture_output=True,
+        text=True,
+        timeout=120,
     )
     assert proc.returncode == 2, proc.stderr[-2000:]
     assert "missing" in proc.stdout
@@ -164,7 +175,9 @@ def test_committed_reference_artifact_exists_and_carries_the_verdict():
     )
     ref = json.loads(DEFAULT_REFERENCE.read_text())
 
-    assert ref["data"]["sha256"] == "4f02ecd2cbc18d82c06766dbd1215fa2599f5fa95f94d254e8fe06841bcfd7c5"
+    assert (
+        ref["data"]["sha256"] == "4f02ecd2cbc18d82c06766dbd1215fa2599f5fa95f94d254e8fe06841bcfd7c5"
+    )
     assert ref["data"]["rows"] == 20_000
     assert ref["data"]["seed"] == 42
     assert ref["data"]["generated"] is True

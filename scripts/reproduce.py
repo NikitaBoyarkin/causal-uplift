@@ -20,6 +20,7 @@ here. ``data.path`` is the one volatile field - it records where the CSV
 happened to live, so it is normalised to its file name before comparing;
 content identity is covered by ``data.sha256``.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -41,7 +42,14 @@ DEFAULT_REFERENCE = ROOT / "reports" / "reference" / "metrics.json"
 
 # Rendering order; any section added later is appended alphabetically.
 SECTION_ORDER = (
-    "data", "cuped", "uplift", "null", "segments", "decision", "preregistration", "n",
+    "data",
+    "cuped",
+    "uplift",
+    "null",
+    "segments",
+    "decision",
+    "preregistration",
+    "n",
 )
 PIPELINE_TIMEOUT = 1800
 MISSING = "<missing>"
@@ -142,7 +150,9 @@ def run_reproduction(
     """
     workdir = pathlib.Path(workdir).expanduser().resolve()
     reference_path = (
-        pathlib.Path(reference).expanduser().resolve() if reference is not None else DEFAULT_REFERENCE
+        pathlib.Path(reference).expanduser().resolve()
+        if reference is not None
+        else DEFAULT_REFERENCE
     )
     fresh_path = workdir / "reports" / "metrics.json"
     record = {
@@ -218,11 +228,15 @@ def _run_pipeline(
     cmd = [
         sys.executable,
         str(ROOT / "run.py"),
-        "--data-path", str(data_path),
-        "--out-dir", str(out_dir),
+        "--data-path",
+        str(data_path),
+        "--out-dir",
+        str(out_dir),
         "--no-plot",
-        "--n-boot", str(n_boot),
-        "--n-null", str(n_null),
+        "--n-boot",
+        str(n_boot),
+        "--n-null",
+        str(n_null),
     ]
     if data_seed is not None:
         cmd += ["--data-seed", str(data_seed)]
@@ -271,7 +285,11 @@ def _section(diffs: list[dict], present: bool, key: str) -> dict:
         return {"status": "missing", "diffs": len(scoped), "detail": "key absent on one side"}
     if scoped:
         first = ", ".join(d["path"] for d in scoped[:3])
-        return {"status": "mismatch", "diffs": len(scoped), "detail": _short(f"{len(scoped)} diff: {first}")}
+        return {
+            "status": "mismatch",
+            "diffs": len(scoped),
+            "detail": _short(f"{len(scoped)} diff: {first}"),
+        }
     return {"status": "match", "diffs": 0, "detail": ""}
 
 
@@ -284,12 +302,16 @@ def _data_detail(data: dict) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="Regenerate causal-uplift metrics and diff a reference.")
+    ap = argparse.ArgumentParser(
+        description="Regenerate causal-uplift metrics and diff a reference."
+    )
     ap.add_argument("--reference", default=str(DEFAULT_REFERENCE), help="reference metrics.json")
     ap.add_argument("--workdir", default=None, help="scratch dir (default: a fresh temp dir)")
     ap.add_argument("--n-boot", type=int, default=400, help="bootstrap resamples per metric")
     ap.add_argument("--n-null", type=int, default=200, help="random scorers for the null")
-    ap.add_argument("--write-reference", action="store_true", help="copy the fresh artifact to --reference")
+    ap.add_argument(
+        "--write-reference", action="store_true", help="copy the fresh artifact to --reference"
+    )
     args = ap.parse_args(argv)
 
     reference = pathlib.Path(args.reference).expanduser().resolve()

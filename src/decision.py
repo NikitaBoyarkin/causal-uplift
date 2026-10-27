@@ -9,6 +9,7 @@ The rule is cost-aware: a campaign is worth running only when the segment
 uplift clears the break-even level set by campaign economics. The functions are
 pure - no I/O, no RNG, no pandas.
 """
+
 from __future__ import annotations
 
 from . import config as C
@@ -21,13 +22,9 @@ INCONCLUSIVE = "inconclusive"
 def break_even_uplift(value_per_conversion: float, campaign_cost_per_user: float) -> float:
     """Uplift at which campaign revenue exactly covers campaign cost."""
     if value_per_conversion <= 0:
-        raise ValueError(
-            f"value_per_conversion must be > 0, got {value_per_conversion!r}"
-        )
+        raise ValueError(f"value_per_conversion must be > 0, got {value_per_conversion!r}")
     if campaign_cost_per_user < 0:
-        raise ValueError(
-            f"campaign_cost_per_user must be >= 0, got {campaign_cost_per_user!r}"
-        )
+        raise ValueError(f"campaign_cost_per_user must be >= 0, got {campaign_cost_per_user!r}")
     return campaign_cost_per_user / value_per_conversion
 
 

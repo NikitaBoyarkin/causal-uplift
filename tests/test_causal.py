@@ -6,6 +6,7 @@ Tests are split in two speeds: CUPED/eval tests are pure numerical checks (fast)
 model tests share a module-scoped fixture so LightGBM trains once, and one
 end-to-end test drives the CLI in a temporary working directory.
 """
+
 import json
 import pathlib
 import subprocess
@@ -36,14 +37,15 @@ def up() -> dict:
 
 # --- data contract -----------------------------------------------------------
 
+
 def test_data_sanity():
     df = _df()
     assert len(df) == 20000
-    assert abs(df.treatment.mean() - 0.5) < 0.02          # randomized
+    assert abs(df.treatment.mean() - 0.5) < 0.02  # randomized
     ate_obs = df[df.treatment == 1].y_cont.mean() - df[df.treatment == 0].y_cont.mean()
     ate_true = df.tau_true.mean()
-    assert abs(ate_obs - ate_true) < 0.06                 # observed ATE close to truth
-    assert df.x_pre.corr(df.y_cont) > 0.5                  # CUPED covariate is informative
+    assert abs(ate_obs - ate_true) < 0.06  # observed ATE close to truth
+    assert df.x_pre.corr(df.y_cont) > 0.5  # CUPED covariate is informative
 
 
 def test_treatment_is_independent_of_segment_and_covariate():
@@ -52,12 +54,12 @@ def test_treatment_is_independent_of_segment_and_covariate():
     for seg in sorted(df.segment.unique()):
         share = df.loc[df.segment == seg, "treatment"].mean()
         assert abs(share - 0.5) < 0.02, f"segment {seg} treated share {share}"
-    gap = abs(df.loc[df.treatment == 1, "x_pre"].mean()
-              - df.loc[df.treatment == 0, "x_pre"].mean())
+    gap = abs(df.loc[df.treatment == 1, "x_pre"].mean() - df.loc[df.treatment == 0, "x_pre"].mean())
     assert gap < 0.05, f"covariate imbalance {gap}"
 
 
 # --- CUPED -------------------------------------------------------------------
+
 
 def test_cuped_preserves_ate_and_shrinks_se():
     r = run_cuped(_df(), y_col="y_cont", x_col="x_pre")
@@ -102,6 +104,7 @@ def test_cuped_rejects_degenerate_covariate():
 
 # --- eval primitives ---------------------------------------------------------
 
+
 def test_ate_with_se_known_values():
     df = pd.DataFrame({"treatment": [1, 1, 1, 0, 0, 0], "y": [3.0, 4.0, 5.0, 0.0, 1.0, 2.0]})
     r = ate_with_se(df, "y")
@@ -110,6 +113,16 @@ def test_ate_with_se_known_values():
     assert r["var_c"] == pytest.approx(1.0)
     assert r["se"] == pytest.approx(np.sqrt(1 / 3 + 1 / 3))
     assert r["ci_low"] < r["ate"] < r["ci_high"]
+
+
+def test_ate_with_se_ci_level_changes_interval_width():
+    """The z-multiplier must come from ci_level, not a hardcoded 1.96."""
+    df = pd.DataFrame({"treatment": [1, 1, 1, 0, 0, 0], "y": [3.0, 4.0, 5.0, 0.0, 1.0, 2.0]})
+    narrow = ate_with_se(df, "y", ci_level=0.80)
+    wide = ate_with_se(df, "y", ci_level=0.95)
+    assert (narrow["ci_high"] - narrow["ci_low"]) < (wide["ci_high"] - wide["ci_low"])
+    assert np.isclose((wide["ci_high"] - wide["ate"]) / wide["se"], 1.959963984540054)
+    assert np.isclose((narrow["ci_high"] - narrow["ate"]) / narrow["se"], 1.2815515655446004)
 
 
 def test_ate_with_se_rejects_empty_arm():
@@ -128,7 +141,7 @@ def test_uplift_at_top_k_finds_top_not_bottom():
     n = 20000
     x = rng.normal(size=n)
     w = rng.integers(0, 2, size=n)
-    p = 1 / (1 + np.exp(-(0.2 * x + 1.5 * x * w)))    # effect grows with x
+    p = 1 / (1 + np.exp(-(0.2 * x + 1.5 * x * w)))  # effect grows with x
     y = (rng.random(n) < p).astype(float)
     assert ueval.uplift_at_top_k(x, y, w, 0.2) > 0.15
     assert ueval.uplift_at_top_k(-x, y, w, 0.2) < -0.15
@@ -203,6 +216,7 @@ def test_ite_recovery_is_nan_when_tau_has_no_variance(up):
 
 # --- uplift models -----------------------------------------------------------
 
+
 def test_segment_dtype_is_shared_across_arms():
     """Same string must map to the same code even if a subset lacks a level.
 
@@ -256,11 +270,13 @@ def test_learners_honour_the_requested_outcome_column():
     """`y_col` was accepted but ignored - the body read `.y_bin` directly."""
     df = _df().iloc[:900].assign(y_alt=lambda d: (d.x_pre > 0).astype(int))
     train, test = df.iloc[:600], df.iloc[600:]
-    assert not np.allclose(t_learner(train, test, y_col="y_bin"),
-                           t_learner(train, test, y_col="y_alt"))
+    assert not np.allclose(
+        t_learner(train, test, y_col="y_bin"), t_learner(train, test, y_col="y_alt")
+    )
 
 
 # --- end to end --------------------------------------------------------------
+
 
 def test_cli_writes_valid_json_and_plot(tmp_path):
     """Drives run.py from a foreign cwd into a scratch out-dir.
@@ -271,9 +287,20 @@ def test_cli_writes_valid_json_and_plot(tmp_path):
     """
     out_dir = tmp_path / "reports"
     proc = subprocess.run(
-        [sys.executable, str(ROOT / "run.py"), "--out-dir", str(out_dir),
-         "--n-boot", "20", "--n-null", "20"],
-        cwd=tmp_path, capture_output=True, text=True, timeout=600,
+        [
+            sys.executable,
+            str(ROOT / "run.py"),
+            "--out-dir",
+            str(out_dir),
+            "--n-boot",
+            "20",
+            "--n-null",
+            "20",
+        ],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=600,
     )
     assert proc.returncode == 0, proc.stderr[-2000:]
     assert "=== Decision (pre-registered rule) ===" in proc.stdout
@@ -289,7 +316,9 @@ def test_cli_writes_valid_json_and_plot(tmp_path):
     assert decision["decision"] in {"ship", "no_ship", "inconclusive"}
     assert decision["break_even_uplift"] == pytest.approx(0.05)
     assert set(decision["cost_of_error"]) == {
-        "ship_if_no_effect", "no_ship_if_effect", "worst_case_total",
+        "ship_if_no_effect",
+        "no_ship_if_effect",
+        "worst_case_total",
     }
     assert len(out["preregistration"]["sha256"]) == 64
     assert len(out["data"]["sha256"]) == 64

@@ -23,6 +23,7 @@ import numpy as np
 import pandas as pd
 
 from data.generate_data import SEED, N, write_dataset
+from src import config as C
 from src import eval as ueval
 from src.cuped import run_cuped
 from src.decision import ship_decision
@@ -42,7 +43,8 @@ def _print_cuped(cuped: dict) -> None:
     c = cuped["cuped"]
     print("\n=== CUPED (variance reduction) ===")
     print(f"covariate=x_pre, outcome=y_cont, rho={cuped['rho']:.3f}, theta={cuped['theta']:.3f}")
-    print(f"{'method':<8}{'ATE':>9}{'SE':>9}   CI95")
+    ci_label = f"CI{C.DECISION['ci_level'] * 100:.0f}%"
+    print(f"{'method':<8}{'ATE':>9}{'SE':>9}   {ci_label}")
     print(f"{'naive':<8}{n['ate']:>9.3f}{n['se']:>9.3f}   [{n['ci_low']:.3f}, {n['ci_high']:.3f}]")
     print(f"{'cuped':<8}{c['ate']:>9.3f}{c['se']:>9.3f}   [{c['ci_low']:.3f}, {c['ci_high']:.3f}]")
     print(
@@ -73,7 +75,7 @@ def _print_uplift(results: dict, nulls: dict) -> None:
             f"{r['ite_recovery']['rank_corr_with_true']:>11.3f}"
         )
 
-    print("\n95% bootstrap intervals:")
+    print(f"\n{C.DECISION['ci_level'] * 100:.0f}% bootstrap intervals:")
     print(f"{'model':<11}{'AUUC':>19}{'QINI':>19}{'uplift@20%':>19}")
     for name in MODELS:
         r = results[name]
@@ -283,7 +285,7 @@ def _plot(up, test, truth, out_dir):
         markersize=24,
         linewidth=2,
         zorder=5,
-        label="empirical gap (95% CI)",
+        label=f"empirical gap ({C.DECISION['ci_level'] * 100:.0f}% CI)",
     )
     ax[1].set_xticks(x)
     ax[1].set_xticklabels(list(segs))

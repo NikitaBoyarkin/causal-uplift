@@ -1,4 +1,5 @@
 """Tests for the pre-registered ship / no_ship / inconclusive rule."""
+
 from __future__ import annotations
 
 import pathlib
@@ -12,8 +13,9 @@ from src.decision import INCONCLUSIVE, NO_SHIP, SHIP, break_even_uplift, ship_de
 ROOT = pathlib.Path(__file__).parent.parent
 
 
-def _seg(value: float, lo: float, hi: float, n_t: int = 3000, n_c: int = 3000,
-         n_total: int = 20000) -> dict:
+def _seg(
+    value: float, lo: float, hi: float, n_t: int = 3000, n_c: int = 3000, n_total: int = 20000
+) -> dict:
     """Shape of one `eval.segment_truth` entry: `n_total` is the whole frame (20k),
     while `n_t + n_c` is only the segment's arms (~6k for `new`)."""
     return {"value": value, "lo": lo, "hi": hi, "n_t": n_t, "n_c": n_c, "n_total": n_total}
