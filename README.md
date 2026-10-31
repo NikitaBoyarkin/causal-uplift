@@ -5,6 +5,17 @@
 > Uplift-моделирование показывает, что пользователи из сегмента `new`
 > откликаются **~8 раз** сильнее, чем `returning`.
 
+```text
+╔════════════════════════════════════════════════════╗
+║                                                    ║
+║      *        CAUSAL / UPLIFT                      ║
+║     /|\       CUPED: -26% standard error           ║
+║    /_|_\      uplift: new responds ~8x returning   ║
+║      |        synthetic RCT, known ground truth    ║
+║                                                    ║
+╚════════════════════════════════════════════════════╝
+```
+
 ## Navigation
 
 - 🌐 [Portfolio site](https://nikitaboyarkin.github.io)
