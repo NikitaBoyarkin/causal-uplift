@@ -33,6 +33,7 @@ ROOT = pathlib.Path(__file__).parent
 REPORTS = ROOT / "reports"
 DATA_PATH = ROOT / "data" / "experiment.csv"
 PREREG_PATH = ROOT / "docs" / "preregistration.md"
+DECISION_PATH = ROOT / "src" / "decision.py"
 
 MODELS = ("oracle_tau", "s_learner", "t_learner", "random")
 CURVE_METRICS = ("auuc", "qini", "uplift_at_top20")
@@ -211,6 +212,13 @@ def main() -> None:
         raise RuntimeError(f"pre-registration document missing: {PREREG_PATH}")
     prereg_sha256 = hashlib.sha256(PREREG_PATH.read_bytes()).hexdigest()
 
+    # ...but the prose is not the rule. The executable rule lives in DECISION and
+    # in src/decision.py, so both enter the artifact too: editing either after the
+    # run breaks reproduction, just like editing the document does.
+    if not DECISION_PATH.is_file():
+        raise RuntimeError(f"decision rule module missing: {DECISION_PATH}")
+    decision_sha256 = hashlib.sha256(DECISION_PATH.read_bytes()).hexdigest()
+
     out = {
         "cuped": {
             "rho": cuped["rho"],
@@ -225,6 +233,11 @@ def main() -> None:
         "segments": {k: {a: b for a, b in v.items() if a != "n_boot"} for k, v in truth.items()},
         "decision": decision,
         "preregistration": {"path": _display_path(PREREG_PATH), "sha256": prereg_sha256},
+        "decision_rule": {
+            "config": dict(C.DECISION),
+            "path": _display_path(DECISION_PATH),
+            "sha256": decision_sha256,
+        },
         "n": {"train": up["train_n"], "test": up["test_n"], "bootstrap": args.n_boot},
         "data": {
             "path": _display_path(data_path),

@@ -49,6 +49,7 @@ SECTION_ORDER = (
     "segments",
     "decision",
     "preregistration",
+    "decision_rule",
     "n",
 )
 PIPELINE_TIMEOUT = 1800

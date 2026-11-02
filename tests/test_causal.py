@@ -305,7 +305,16 @@ def test_cli_writes_valid_json_and_plot(tmp_path):
     assert proc.returncode == 0, proc.stderr[-2000:]
     assert "=== Decision (pre-registered rule) ===" in proc.stdout
     out = json.loads((out_dir / "metrics.json").read_text())
-    assert set(out) >= {"cuped", "uplift", "null", "n", "data", "decision", "preregistration"}
+    assert set(out) >= {
+        "cuped",
+        "uplift",
+        "null",
+        "n",
+        "data",
+        "decision",
+        "preregistration",
+        "decision_rule",
+    }
     assert set(out["uplift"]) >= {"oracle_tau", "t_learner", "s_learner", "random"}
     for row in out["uplift"].values():
         for key in ("auuc", "qini", "uplift_at_top20"):

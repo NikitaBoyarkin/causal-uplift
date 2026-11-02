@@ -22,6 +22,7 @@ from scripts.reproduce import (
     normalize_metrics,
     run_reproduction,
 )
+from src import config as C
 
 ROOT = pathlib.Path(__file__).parent.parent
 SCRIPT = ROOT / "scripts" / "reproduce.py"
@@ -201,3 +202,12 @@ def test_committed_reference_artifact_exists_and_carries_the_verdict():
     # refreshing the reference fails here, not silently at reproduction time.
     doc_sha = hashlib.sha256((ROOT / "docs" / "preregistration.md").read_bytes()).hexdigest()
     assert ref["preregistration"] == {"path": "docs/preregistration.md", "sha256": doc_sha}
+
+    # The prose is not the rule: the executable rule is hashed too, so editing
+    # `DECISION` or `src/decision.py` after the run breaks reproduction as well.
+    rule_sha = hashlib.sha256((ROOT / "src" / "decision.py").read_bytes()).hexdigest()
+    assert ref["decision_rule"] == {
+        "config": dict(C.DECISION),
+        "path": "src/decision.py",
+        "sha256": rule_sha,
+    }
