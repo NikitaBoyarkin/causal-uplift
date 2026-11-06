@@ -20,6 +20,8 @@
 > Uplift-моделирование показывает, что пользователи из сегмента `new`
 > откликаются **~8 раз** сильнее, чем `returning`.
 
+**Public link:** [демо](https://nikitaboyarkin.github.io/demos/causal/index.html) · [кейс](https://nikitaboyarkin.github.io/projects/causal/) · [исходники](https://github.com/NikitaBoyarkin/causal-uplift)
+
 ```text
 ╔════════════════════════════════════════════════════╗
 ║                                                    ║
@@ -106,6 +108,9 @@ ITE) на синтетическом рандомизированном эксп
 ровно несбалансированность ковариаты `θ(x̄t − x̄c)`, которую идеально
 сбалансированное разбиение обнулило бы). Стандартная ошибка падает на ~26%
 (×0,742), интервал сужается в 1,35 раза.
+
+![Naive и CUPED: ATE с 95%-доверительными интервалами, SE 0,019 → 0,014](reports/eda/figures/fig3_cuped_ci.png)
+*Что показано: доверительный интервал CUPED-оценки ATE (0,276) против наивной (0,270) — то же среднее, но SE 0,014 вместо 0,019 и интервал уже в 1,35 раза; на этом сужении и стоит решение `ship` для сегмента `new`. Оговорка: данные синтетические (seed 42), интервал — перцентильный бутстрэп на одном тестовом сплите, поэтому −26% относится к этой выборке, а не к любому будущему эксперименту.*
 
 Сокращение дисперсии: **0,449 фактически против 0,445 по теории (ρ²)** — они
 совпадают, как и должны: `x_pre` — настоящая предпериодная ковариата, а оценка
@@ -224,10 +229,13 @@ uplift@20% лежат чуть выше нуля, и все интервалы �
 
 ## Quick start
 
+Требуется Python ≥ 3.10 (`requires-python = ">=3.10"` в `pyproject.toml`) и
+[`uv`](https://docs.astral.sh/uv/).
+
 ```bash
 uv sync
 uv run python run.py                  # CSV generated automatically when absent
-uv run pytest -q                      # 59 tests
+uv run pytest -q                      # 66 tests
 uv run ruff check run.py src tests scripts data
 uv run python scripts/reproduce.py    # regenerate + diff the committed artifact
 ```
@@ -310,13 +318,29 @@ causal-uplift/
 │   └── eval.py                # AUUC, QINI, uplift@k, null/CI
 ├── docs/preregistration.md    # decision rule fixed before the analysis
 ├── scripts/reproduce.py       # regenerate + diff the reference artifact
-├── tests/                     # 59 tests
-├── reports/                   # metrics.json + uplift.png (gitignored)
-│   └── reference/             # committed metrics.json: reproducibility baseline
+├── tests/                     # 66 tests
+├── reports/                   # рабочие выходы: metrics.json + uplift.png (gitignored)
+│   ├── reference/             # committed metrics.json: reproducibility baseline
+│   └── eda/                   # committed: EDA-отчёт, findings.md и 5 фигур
+│       ├── figures/           # fig1..fig5 (PNG, dpi=300), в т.ч. fig3_cuped_ci.png
+│       └── scripts/           # analysis.py + analysis_results.json + plot_figures.py
 ├── run.py                     # CLI (bootstraps the CSV when absent)
 ├── uv.lock                    # committed: reproducible environment
 └── pyproject.toml
 ```
+
+`reports/eda/` — исключение из правила gitignore: шаблоны `reports/*.png` и
+`reports/*.json` глушат только верхний уровень, поэтому подкаталог EDA
+закоммичен целиком, включая `figures/fig3_cuped_ci.png` (иллюстрация к разделу
+CUPED выше). Фигуры пересобираются из зафиксированных результатов анализа:
+
+```bash
+uv run python reports/eda/scripts/plot_figures.py   # reads analysis_results.json → reports/eda/figures/*.png
+```
+
+Скрипт читает и `data/experiment.csv`, который в gitignore, поэтому на чистом
+клоне сначала: `uv run python data/generate_data.py` (или `uv run python run.py`,
+он создаёт CSV, если его нет).
 
 ## Notes
 
